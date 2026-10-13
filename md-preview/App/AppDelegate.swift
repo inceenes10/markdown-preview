@@ -579,7 +579,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard !requiresNoDocuments || NSDocumentController.shared.documents.isEmpty else { return }
             NSApp.activate(ignoringOtherApps: true)
             if WelcomeScreenSetting.isEnabled {
-                self.openWelcomeWindow()
+                DocumentWindowController.openWelcomeWindow()
             } else {
                 NSDocumentController.shared.openDocument(nil)
             }
@@ -609,15 +609,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         controller.openFolder(url)
-    }
-
-    /// A document window with nothing in it yet, on the Welcome screen.
-    private func openWelcomeWindow() {
-        let document = MarkdownDocument()
-        NSDocumentController.shared.addDocument(document)
-        document.makeWindowControllers()
-        document.showWindows()
-        (document.windowControllers.first as? DocumentWindowController)?.showWelcome()
     }
 
     private var isOpenPanelVisible: Bool {

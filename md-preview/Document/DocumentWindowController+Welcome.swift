@@ -23,6 +23,17 @@ extension DocumentWindowController {
             .first(where: \.isShowingWelcome)
     }
 
+    /// Opens a document window with nothing in it yet, on the Welcome screen:
+    /// a window of its own at launch, a tab of the front window for New Tab.
+    static func openWelcomeWindow(asTab: Bool = false) {
+        if asTab { markNextWindowAsTab() }
+        let document = MarkdownDocument()
+        NSDocumentController.shared.addDocument(document)
+        document.makeWindowControllers()
+        document.showWindows()
+        (document.windowControllers.first as? DocumentWindowController)?.showWelcome()
+    }
+
     func showWelcome() {
         guard currentFileURL == nil, let split = mainSplit, !split.isEditingDocument else { return }
         documentWindow.title = NSLocalizedString("Welcome", comment: "Window title on the Welcome screen")

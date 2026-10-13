@@ -52,8 +52,13 @@ extension DocumentWindowController {
     /// makes AppKit show the "+" button in the tab bar, and the app hides
     /// that button. Shows the File ▸ Open panel, whose choice — a file, or
     /// its New Document button — opens as a tab: an explicit tab request,
-    /// unlike ⌘O.
+    /// unlike ⌘O. With the Welcome screen on, the new tab starts there
+    /// instead, and the reader picks from it.
     @objc func newDocumentTab(_ sender: Any?) {
+        if WelcomeScreenSetting.isEnabled {
+            Self.openWelcomeWindow(asTab: true)
+            return
+        }
         guard let controller = NSDocumentController.shared as? MarkdownDocumentController else {
             promptForDocument(openAsTab: true)
             return
