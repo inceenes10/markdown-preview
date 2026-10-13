@@ -385,6 +385,8 @@
 "Expand Table" = "Expand Table";
 
 /* Welcome screen */
+"No Document Selected" = "No Document Selected";
+"Choose a file in the sidebar, or press ⇧⌘O to search this folder." = "Choose a file in the sidebar, or press ⇧⌘O to search this folder.";
 "Drop to Open" = "Drop to Open";
 "Shortcuts" = "Shortcuts";
 "Or drop a Markdown file or folder here." = "Or drop a Markdown file or folder here.";

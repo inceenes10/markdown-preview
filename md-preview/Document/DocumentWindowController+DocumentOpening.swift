@@ -69,13 +69,16 @@ extension DocumentWindowController {
     func openFolder(_ folderURL: URL) {
         let folderURL = folderURL.standardizedFileURL
         RecentFolders.note(folderURL)
-        hideWelcome()
+        hidePlaceholder()
         if currentFileURL == nil {
             documentWindow.title = folderURL.lastPathComponent
             updateWindowSubtitle()
         }
         (documentWindow.contentViewController as? MainSplitViewController)?
             .openFolder(folderURL, selectedFileURL: currentFileURL)
+        if currentFileURL == nil, !isEditing {
+            mainSplit?.showNoDocumentSelected()
+        }
         documentWindow.makeKeyAndOrderFront(nil)
         NSApp.activate()
         syncSidebarToolbarState()

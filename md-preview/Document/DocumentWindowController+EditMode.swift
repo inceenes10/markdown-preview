@@ -89,6 +89,7 @@ extension DocumentWindowController {
                 startNewDocumentFromWelcome(autofocus: false)
                 return
             }
+            hidePlaceholder()
             enterEditMode()
         }
     }

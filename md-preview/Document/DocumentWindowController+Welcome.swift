@@ -45,12 +45,14 @@ extension DocumentWindowController {
         ))
     }
 
-    func hideWelcome() {
-        mainSplit?.hideWelcome()
+    /// Removes whatever stands in for the page: the Welcome screen, or the
+    /// note of a folder window with no file chosen.
+    func hidePlaceholder() {
+        mainSplit?.hidePlaceholder()
     }
 
     func startNewDocumentFromWelcome(autofocus: Bool = true) {
-        hideWelcome()
+        hidePlaceholder()
         documentWindow.title = NSLocalizedString("Untitled", comment: "Window title when no document is open")
         enterEditMode(autofocus: autofocus)
     }

@@ -385,6 +385,8 @@
 "Expand Table" = "展开表格";
 
 /* Welcome screen */
+"No Document Selected" = "未选择文稿";
+"Choose a file in the sidebar, or press ⇧⌘O to search this folder." = "在边栏中选择一个文件，或按 ⇧⌘O 搜索此文件夹。";
 "Drop to Open" = "松开以打开";
 "Shortcuts" = "快捷键";
 "Or drop a Markdown file or folder here." = "也可以将 Markdown 文件或文件夹拖放到此处。";

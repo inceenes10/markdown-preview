@@ -385,6 +385,8 @@
 "Expand Table" = "表を拡大";
 
 /* Welcome screen */
+"No Document Selected" = "書類が選択されていません";
+"Choose a file in the sidebar, or press ⇧⌘O to search this folder." = "サイドバーでファイルを選ぶか、⇧⌘O を押してこのフォルダを検索します。";
 "Drop to Open" = "ドロップして開く";
 "Shortcuts" = "ショートカット";
 "Or drop a Markdown file or folder here." = "Markdown ファイルまたはフォルダをここにドロップすることもできます。";

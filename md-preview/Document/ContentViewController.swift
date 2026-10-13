@@ -230,17 +230,28 @@ final class ContentViewController: NSViewController {
         webView.clearContent()
     }
 
-    // MARK: - Welcome screen
+    // MARK: - Placeholders
 
-    private var welcomeView: NSView?
-
-    var isShowingWelcome: Bool { welcomeView != nil }
+    /// What stands in for the page while the window has no document: the
+    /// Welcome screen, or a note that a folder is open with no file chosen.
+    private var placeholderView: NSView?
+    private(set) var isShowingWelcome = false
 
     /// Covers the empty page with the Welcome screen until a document, a
     /// folder or a new draft takes the window over.
     func showWelcome(actions: WelcomeActions) {
-        guard welcomeView == nil else { return }
-        let host = NSHostingView(rootView: WelcomeView(model: WelcomeModel(), actions: actions))
+        showPlaceholder(WelcomeView(model: WelcomeModel(), actions: actions))
+        isShowingWelcome = true
+    }
+
+    /// Covers the empty page of a folder window until a file is chosen.
+    func showNoDocumentSelected() {
+        showPlaceholder(NoDocumentSelectedView())
+    }
+
+    private func showPlaceholder(_ content: some View) {
+        hidePlaceholder()
+        let host = NSHostingView(rootView: content)
         host.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(host, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate([
@@ -249,12 +260,13 @@ final class ContentViewController: NSViewController {
             host.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             host.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
-        welcomeView = host
+        placeholderView = host
     }
 
-    func hideWelcome() {
-        welcomeView?.removeFromSuperview()
-        welcomeView = nil
+    func hidePlaceholder() {
+        placeholderView?.removeFromSuperview()
+        placeholderView = nil
+        isShowingWelcome = false
     }
 
     func sourceFileURLDidChange(_ sourceURL: URL) {

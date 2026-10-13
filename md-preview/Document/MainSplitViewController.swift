@@ -101,8 +101,12 @@ final class MainSplitViewController: NSSplitViewController {
         contentViewController?.showWelcome(actions: actions)
     }
 
-    func hideWelcome() {
-        contentViewController?.hideWelcome()
+    func showNoDocumentSelected() {
+        contentViewController?.showNoDocumentSelected()
+    }
+
+    func hidePlaceholder() {
+        contentViewController?.hidePlaceholder()
     }
 
     func display(markdown: String, fileName: String, url: URL?, assetBaseURL: URL?) {

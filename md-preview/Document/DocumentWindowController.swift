@@ -448,7 +448,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             if let fragment { split?.scrollToAnchor(fragment) }
             return
         }
-        hideWelcome()
+        hidePlaceholder()
         let restoredScrollPosition = commitNavigation(to: url, intent: intent)
 
         // Switching to a different file blanks the preview so the previous
