@@ -38,9 +38,10 @@ extension DocumentWindowController {
         mainSplit?.hideWelcome()
     }
 
-    func startNewDocumentFromWelcome() {
+    func startNewDocumentFromWelcome(autofocus: Bool = true) {
+        hideWelcome()
         documentWindow.title = NSLocalizedString("Untitled", comment: "Window title when no document is open")
-        enterEditMode(autofocus: true)
+        enterEditMode(autofocus: autofocus)
     }
 
     /// Folders get a panel of their own that offers nothing else, so the
@@ -65,13 +66,22 @@ extension DocumentWindowController {
             NSSound.beep()
             return
         }
-        // A file that is already open elsewhere comes to the front instead
-        // of loading a second time here.
-        if !url.isExistingDirectory,
-           let open = NSDocumentController.shared.document(for: url) {
-            open.showWindows()
+        if url.isExistingDirectory {
+            openFolder(url)
             return
         }
-        present(url: url)
+        // Through the document controller, which reads the file before this
+        // screen gives way to it and brings an already open file to the
+        // front instead of loading it a second time.
+        NSDocumentController.shared.openDocument(withContentsOf: url,
+                                                 display: true) { [weak self] document, _, error in
+            // An open document whose window was closed has none to show.
+            if let document, document.windowControllers.isEmpty {
+                document.makeWindowControllers()
+                document.showWindows()
+            }
+            guard let self, let error else { return }
+            NSAlert(error: error).beginSheetModal(for: self.documentWindow)
+        }
     }
 }

@@ -173,6 +173,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     /// even when the system tabbing preference wouldn't put it there.
     static var nextWindowRequestsTab = false
 
+    /// Whether the next window was asked for by Open in New Tab or Open in
+    /// New Window, which the Welcome screen must not answer in their place.
+    static var hasExplicitPlacementRequest: Bool {
+        nextWindowRequestsTab || nextWindowDeclinesTabbing
+    }
+
     static func markNextWindowAsSeparate() {
         nextWindowDeclinesTabbing = true
     }

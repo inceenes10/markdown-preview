@@ -15,7 +15,6 @@ extension DocumentWindowController {
             NSSound.beep()
             return
         }
-        hideWelcome()
 
         // Edit the complete source. Frontmatter is stripped only by the
         // read-only renderer; the editor must expose and preserve it.

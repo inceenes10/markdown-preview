@@ -55,7 +55,8 @@ final class WelcomeModel {
         files = NSDocumentController.shared.recentDocumentURLs
             .filter { url in
                 url.isFileURL
-                    && ProjectFileIndex.markdownExtensions.contains(url.pathExtension.lowercased())
+                    && (ProjectFileIndex.markdownExtensions.contains(url.pathExtension.lowercased())
+                        || url.pathExtension.lowercased() == "txt")
                     && FileManager.default.fileExists(atPath: url.path)
             }
             .prefix(Self.fileLimit)

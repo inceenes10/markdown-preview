@@ -76,10 +76,12 @@ final class MarkdownDocumentController: NSDocumentController {
         let completionHandler = finishingPanelTabOpen(completionHandler)
         // A window still on the Welcome screen has nothing of its own to
         // keep: the document loads there instead of opening a second window.
+        // An explicit Open in New Tab or New Window still gets what it asked
+        // for.
         if displayDocument, !url.isExistingDirectory, document(for: url) == nil,
+           !DocumentWindowController.hasExplicitPlacementRequest,
            let welcome = DocumentWindowController.showingWelcome {
-            welcome.present(url: url)
-            completionHandler(welcome.document as? NSDocument, false, nil)
+            openInWelcomeWindow(welcome, url: url, completionHandler: completionHandler)
             return
         }
         if url.isExistingDirectory,
@@ -98,8 +100,10 @@ final class MarkdownDocumentController: NSDocumentController {
 
     override func openUntitledDocumentAndDisplay(_ displayDocument: Bool) throws -> NSDocument {
         defer { clearPendingPanelTabOpen() }
-        // The window on the Welcome screen already is an untitled document.
-        if displayDocument, let welcome = DocumentWindowController.showingWelcome,
+        // The window on the Welcome screen already is an untitled document;
+        // New Tab's New Document button still opens a tab of its own.
+        if displayDocument, !DocumentWindowController.hasExplicitPlacementRequest,
+           let welcome = DocumentWindowController.showingWelcome,
            let document = welcome.document as? NSDocument {
             welcome.startNewDocumentFromWelcome()
             return document
@@ -110,6 +114,46 @@ final class MarkdownDocumentController: NSDocumentController {
                 .enterEditMode(autofocus: true)
         }
         return document
+    }
+
+    /// Reads the file before the Welcome screen gives way to it, so a file
+    /// that cannot be read leaves the screen up and reaches the caller as
+    /// the error it is, as it would from `NSDocument`'s own read.
+    private func openInWelcomeWindow(
+        _ welcome: DocumentWindowController,
+        url: URL,
+        completionHandler: @escaping (NSDocument?, Bool, Error?) -> Void
+    ) {
+        Task {
+            let result = await Self.readMarkdown(at: url)
+            switch result {
+            case .success(let markdown):
+                // The window may have been taken over or closed meanwhile.
+                guard welcome.isShowingWelcome, welcome.window != nil else {
+                    super.openDocument(withContentsOf: url, display: true,
+                                       completionHandler: completionHandler)
+                    return
+                }
+                welcome.present(url: url, preservingEditMode: false,
+                                intent: .normal, fragment: nil, loadedMarkdown: markdown)
+                completionHandler(welcome.document as? NSDocument, false, nil)
+            case .failure(let error):
+                completionHandler(nil, false, error)
+            }
+        }
+    }
+
+    @concurrent
+    private nonisolated static func readMarkdown(at url: URL) async -> Result<String, NSError> {
+        do {
+            let data = try Data(contentsOf: url)
+            guard let text = String(data: data, encoding: .utf8) else {
+                throw CocoaError(.fileReadCorruptFile, userInfo: [NSURLErrorKey: url])
+            }
+            return .success(text)
+        } catch {
+            return .failure(error as NSError)
+        }
     }
 
     /// A file that is already open, or a folder, creates no window, so the

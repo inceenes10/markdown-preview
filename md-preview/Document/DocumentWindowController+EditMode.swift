@@ -85,6 +85,10 @@ extension DocumentWindowController {
             // Enter without placing a caret or selecting the toolbar search
             // field. Clicking the document will focus the editor explicitly.
             window?.makeFirstResponder(nil)
+            if isShowingWelcome {
+                startNewDocumentFromWelcome(autofocus: false)
+                return
+            }
             enterEditMode()
         }
     }
