@@ -63,6 +63,8 @@ extension DocumentWindowController {
 
     func openFolder(_ folderURL: URL) {
         let folderURL = folderURL.standardizedFileURL
+        RecentFolders.note(folderURL)
+        hideWelcome()
         if currentFileURL == nil {
             documentWindow.title = folderURL.lastPathComponent
             updateWindowSubtitle()

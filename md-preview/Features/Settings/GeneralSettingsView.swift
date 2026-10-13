@@ -26,6 +26,15 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                Toggle(isOn: $model.showsWelcomeScreen) {
+                    Text(L("Show Welcome screen"))
+                    Text(L("When Markdown Preview opens with no document, show your recent folders and files instead of the Open panel."))
+                }
+            } header: {
+                Text(L("Startup"))
+            }
+
+            Section {
                 Toggle(isOn: $model.isAlwaysOnTop) {
                     Text(L("Always on Top"))
                     Text(L("Keeps every Markdown Preview window in front of other apps, including windows you open later. A window in full screen is left alone until it comes back out."))

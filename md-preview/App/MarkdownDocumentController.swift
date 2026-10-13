@@ -11,7 +11,17 @@ final class MarkdownDocumentController: NSDocumentController {
 
     override func clearRecentDocuments(_ sender: Any?) {
         super.clearRecentDocuments(sender)
+        RecentFolders.clear()
         NotificationCenter.default.post(name: Self.recentDocumentsDidClear, object: self)
+    }
+
+    /// Forgets one file. `NSDocumentController` has no call for it: clear,
+    /// then note the others again, oldest first so the order survives. The
+    /// recent folders are a separate list and stay as they are.
+    func removeRecentDocumentURL(_ url: URL) {
+        let remaining = recentDocumentURLs.filter { $0 != url }
+        super.clearRecentDocuments(nil)
+        remaining.reversed().forEach(noteNewRecentDocumentURL)
     }
 
     private static let markdownFileExtensions = ["md", "markdown", "mdown", "mdx", "txt"]
@@ -64,6 +74,14 @@ final class MarkdownDocumentController: NSDocumentController {
         completionHandler: @escaping (NSDocument?, Bool, Error?) -> Void
     ) {
         let completionHandler = finishingPanelTabOpen(completionHandler)
+        // A window still on the Welcome screen has nothing of its own to
+        // keep: the document loads there instead of opening a second window.
+        if displayDocument, !url.isExistingDirectory, document(for: url) == nil,
+           let welcome = DocumentWindowController.showingWelcome {
+            welcome.present(url: url)
+            completionHandler(welcome.document as? NSDocument, false, nil)
+            return
+        }
         if url.isExistingDirectory,
            let appDelegate = NSApp.delegate as? AppDelegate {
             appDelegate.openFolder(url)
@@ -80,6 +98,12 @@ final class MarkdownDocumentController: NSDocumentController {
 
     override func openUntitledDocumentAndDisplay(_ displayDocument: Bool) throws -> NSDocument {
         defer { clearPendingPanelTabOpen() }
+        // The window on the Welcome screen already is an untitled document.
+        if displayDocument, let welcome = DocumentWindowController.showingWelcome,
+           let document = welcome.document as? NSDocument {
+            welcome.startNewDocumentFromWelcome()
+            return document
+        }
         let document = try super.openUntitledDocumentAndDisplay(displayDocument)
         if displayDocument {
             (document.windowControllers.first as? DocumentWindowController)?

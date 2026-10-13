@@ -383,3 +383,21 @@
 
 /* Table fullscreen control. */
 "Expand Table" = "Expand Table";
+
+/* Welcome screen */
+"Drop to Open" = "Drop to Open";
+"Shortcuts" = "Shortcuts";
+"Or drop a Markdown file or folder here." = "Or drop a Markdown file or folder here.";
+"Version %@" = "Version %@";
+"Start" = "Start";
+"Recent" = "Recent";
+"Welcome" = "Welcome";
+"Open File…" = "Open File…";
+"New Document" = "New Document";
+"Recent Folders" = "Recent Folders";
+"Recent Files" = "Recent Files";
+"No recent items" = "No recent items";
+"Remove from Recents" = "Remove from Recents";
+"Startup" = "Startup";
+"Show Welcome screen" = "Show Welcome screen";
+"When Markdown Preview opens with no document, show your recent folders and files instead of the Open panel." = "When Markdown Preview opens with no document, show your recent folders and files instead of the Open panel.";

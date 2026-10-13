@@ -114,6 +114,15 @@ final class SettingsModel {
         }
     }
 
+    /// A plain stored default, read the next time the app has no document
+    /// open to show.
+    var showsWelcomeScreen: Bool {
+        didSet {
+            guard !isRestoringExternalValues, showsWelcomeScreen != oldValue else { return }
+            WelcomeScreenSetting.isEnabled = showsWelcomeScreen
+        }
+    }
+
     var opensMarkdownLinksInNewWindows: Bool {
         didSet {
             guard !isRestoringExternalValues else { return }
@@ -269,6 +278,7 @@ final class SettingsModel {
         strictLineBreaks = StrictLineBreaksSetting.current
         isAlwaysOnTop = AlwaysOnTopPolicy.isEnabled
         opensDocumentsInTabs = TabOpeningPolicy.isEnabled
+        showsWelcomeScreen = WelcomeScreenSetting.isEnabled
         opensMarkdownLinksInNewWindows = UserDefaults.standard.bool(forKey: "MarkdownPreview.opensMarkdownLinksInNewWindows")
         sendsCrashReports = CrashReporter.isEnabled
         themeColors = ThemeColorsSetting.current
@@ -328,6 +338,7 @@ final class SettingsModel {
         strictLineBreaks = StrictLineBreaksSetting.current
         isAlwaysOnTop = AlwaysOnTopPolicy.isEnabled
         opensDocumentsInTabs = TabOpeningPolicy.isEnabled
+        showsWelcomeScreen = WelcomeScreenSetting.isEnabled
         opensMarkdownLinksInNewWindows = UserDefaults.standard.bool(forKey: "MarkdownPreview.opensMarkdownLinksInNewWindows")
         sendsCrashReports = CrashReporter.isEnabled
         themeColors = ThemeColorsSetting.current

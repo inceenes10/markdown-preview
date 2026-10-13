@@ -93,6 +93,18 @@ final class MainSplitViewController: NSSplitViewController {
         contentViewController?.showSnapshot(prefetch)
     }
 
+    var isShowingWelcome: Bool {
+        contentViewController?.isShowingWelcome ?? false
+    }
+
+    func showWelcome(actions: WelcomeActions) {
+        contentViewController?.showWelcome(actions: actions)
+    }
+
+    func hideWelcome() {
+        contentViewController?.hideWelcome()
+    }
+
     func display(markdown: String, fileName: String, url: URL?, assetBaseURL: URL?) {
         contentViewController?.display(
             markdown: markdown,

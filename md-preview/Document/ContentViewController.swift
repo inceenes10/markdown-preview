@@ -5,6 +5,7 @@
 
 import Cocoa
 import os
+import SwiftUI
 import WebKit
 
 /// Where the preview should land after the next document render — a link
@@ -227,6 +228,33 @@ final class ContentViewController: NSViewController {
         exportSource = nil
         resetScrollspy()
         webView.clearContent()
+    }
+
+    // MARK: - Welcome screen
+
+    private var welcomeView: NSView?
+
+    var isShowingWelcome: Bool { welcomeView != nil }
+
+    /// Covers the empty page with the Welcome screen until a document, a
+    /// folder or a new draft takes the window over.
+    func showWelcome(actions: WelcomeActions) {
+        guard welcomeView == nil else { return }
+        let host = NSHostingView(rootView: WelcomeView(model: WelcomeModel(), actions: actions))
+        host.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(host, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            host.topAnchor.constraint(equalTo: view.topAnchor),
+            host.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            host.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            host.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
+        welcomeView = host
+    }
+
+    func hideWelcome() {
+        welcomeView?.removeFromSuperview()
+        welcomeView = nil
     }
 
     func sourceFileURLDidChange(_ sourceURL: URL) {

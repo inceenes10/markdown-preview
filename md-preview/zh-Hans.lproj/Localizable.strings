@@ -383,3 +383,21 @@
 
 /* Table fullscreen control. */
 "Expand Table" = "展开表格";
+
+/* Welcome screen */
+"Drop to Open" = "松开以打开";
+"Shortcuts" = "快捷键";
+"Or drop a Markdown file or folder here." = "也可以将 Markdown 文件或文件夹拖放到此处。";
+"Version %@" = "版本 %@";
+"Start" = "开始";
+"Recent" = "最近";
+"Welcome" = "欢迎";
+"Open File…" = "打开文件…";
+"New Document" = "新建文稿";
+"Recent Folders" = "最近的文件夹";
+"Recent Files" = "最近的文件";
+"No recent items" = "没有最近项目";
+"Remove from Recents" = "从最近项目中移除";
+"Startup" = "启动";
+"Show Welcome screen" = "显示欢迎页面";
+"When Markdown Preview opens with no document, show your recent folders and files instead of the Open panel." = "Markdown Preview 在没有打开任何文稿时启动，显示最近的文件夹和文件，而不是“打开”面板。";

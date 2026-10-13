@@ -383,3 +383,21 @@
 
 /* Table fullscreen control. */
 "Expand Table" = "表を拡大";
+
+/* Welcome screen */
+"Drop to Open" = "ドロップして開く";
+"Shortcuts" = "ショートカット";
+"Or drop a Markdown file or folder here." = "Markdown ファイルまたはフォルダをここにドロップすることもできます。";
+"Version %@" = "バージョン %@";
+"Start" = "開始";
+"Recent" = "最近使った項目";
+"Welcome" = "ようこそ";
+"Open File…" = "ファイルを開く…";
+"New Document" = "新規書類";
+"Recent Folders" = "最近使ったフォルダ";
+"Recent Files" = "最近使ったファイル";
+"No recent items" = "最近使った項目はありません";
+"Remove from Recents" = "最近使った項目から削除";
+"Startup" = "起動時";
+"Show Welcome screen" = "ウェルカム画面を表示";
+"When Markdown Preview opens with no document, show your recent folders and files instead of the Open panel." = "書類を開かずに Markdown Preview を起動したとき、「開く」パネルの代わりに最近使ったフォルダとファイルを表示します。";
