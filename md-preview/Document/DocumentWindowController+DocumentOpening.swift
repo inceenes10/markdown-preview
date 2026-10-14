@@ -76,7 +76,10 @@ extension DocumentWindowController {
         }
         (documentWindow.contentViewController as? MainSplitViewController)?
             .openFolder(folderURL, selectedFileURL: currentFileURL)
-        if currentFileURL == nil, !isEditing {
+        // Only over an empty page: an untitled draft being previewed has no
+        // file either, and must stay in view.
+        if currentFileURL == nil, !isEditing,
+           currentMarkdown?.isEmpty ?? true, editorDraftMarkdown == nil {
             mainSplit?.showNoDocumentSelected()
         }
         documentWindow.makeKeyAndOrderFront(nil)

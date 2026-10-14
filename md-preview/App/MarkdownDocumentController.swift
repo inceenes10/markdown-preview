@@ -128,8 +128,11 @@ final class MarkdownDocumentController: NSDocumentController {
             let result = await Self.readMarkdown(at: url)
             switch result {
             case .success(let markdown):
-                // The window may have been taken over or closed meanwhile.
-                guard welcome.isShowingWelcome, welcome.window != nil else {
+                // While the file was read, the Welcome window may have been
+                // taken over or closed (its document is gone then), or the
+                // file opened elsewhere; the usual open path handles those.
+                guard welcome.isShowingWelcome, welcome.document != nil,
+                      self.document(for: url) == nil else {
                     super.openDocument(withContentsOf: url, display: true,
                                        completionHandler: completionHandler)
                     return
