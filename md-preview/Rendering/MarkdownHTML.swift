@@ -11,7 +11,7 @@ import Markdown
 // the main actor. This lets MarkdownWebView.display dispatch the render
 // to a concurrent task instead of stalling the main thread on large docs.
 nonisolated enum MarkdownHTML {
-    /// How the heavy KaTeX/Mermaid bundles are delivered.
+    /// How the KaTeX and Pele (diagram) bundles are delivered.
     /// - inline: bundles are embedded as `<script>…</script>` blocks in the
     ///   HTML. Self-contained, used by Quick Look (which delivers HTML as a
     ///   single QLPreviewReply payload). The heavy scripts sit at body-end
@@ -169,13 +169,30 @@ nonisolated enum MarkdownHTML {
     // must come from one source of truth.
     static let bodyFontFamily = "-apple-system, BlinkMacSystemFont, \"SF Pro Text\", system-ui, sans-serif"
     static let codeFontFamily = "ui-monospace, \"SF Mono\", Menlo, monospace"
-    /// Body text sits just above the system Body text style (13pt on macOS)
-    /// for comfortable reading; the heading scale in the stylesheet steps
+    /// Body text: pure black on light, rather than the label's 85% ink; the
+    /// system label color on dark.
+    static let textColorCSS = "--text: light-dark(#000, -apple-system-label);"
+    /// One quote level's indent. Whole pixels: at 1x the editor snaps a
+    /// fractional indent to the pixel grid, so its lines would wrap wider.
+    /// In body ems: the editor's --mdp-body-em keeps a code line's smaller
+    /// font from shrinking it; the preview falls back to the element's em.
+    static let quoteIndentCSS = "--mdp-quote-indent: round(calc(1.5 * var(--mdp-body-em, 1em)), 1px);"
+    /// Full kerning, and no lone short word on a paragraph's last line. Both
+    /// modes share it so entering edit mode keeps every line break.
+    static let bodyTextRenderingCSS = "text-rendering: optimizeLegibility; text-wrap: pretty;"
+    /// Monospace reads larger than the body face at the same size, so block
+    /// code steps down to the inline code size, on whole-pixel lines for the
+    /// editor's 1x snapping. Wrapped code breaks greedily, not `pretty`.
+    static let codeBlockTypeCSS = "font-size: 0.9em; line-height: round(1.3em, 1px); text-wrap-style: auto;"
+    /// Body text sits two points above the system Body text style (13pt on
+    /// macOS) for comfortable reading; the heading scale in the stylesheet steps
     /// through the system title styles (Large Title 26, Title 1 22, Title 2
     /// 17, Title 3 15, Headline 13, Subheadline 11) as em ratios of the body
     /// size, so it scales with this value.
-    static let bodyFontSize: CGFloat = 14
-    static let bodyLineHeight: CGFloat = 1.5
+    static let bodyFontSize: CGFloat = 15
+    /// Keep `sourceLineHeight` a whole pixel: at 1x the editor snaps each
+    /// line box to the pixel grid, so a fractional line drifts from the reader.
+    static let bodyLineHeight: CGFloat = 1.6
     static let pagePaddingTop: CGFloat = 32
     /// App-only breathing room for floating controls, shared by read/edit
     /// pages. It scrolls with the document, leaving the scroll track full-height.
@@ -222,7 +239,7 @@ nonisolated enum MarkdownHTML {
 
     /// Body size, in points, used by the print stylesheet when the app hasn't
     /// injected an explicit choice. CSS `pt` reaches paper 1:1, so this is the
-    /// literal printed size at 100% scale. The on-screen 14px body would print at 10.5pt,
+    /// literal printed size at 100% scale. The on-screen 15px body would print at 11.25pt,
     /// small for paper, so the print default stays at 12pt.
     static let defaultPrintPointSize = 12
 
@@ -246,6 +263,7 @@ nonisolated enum MarkdownHTML {
     /// source line.
     static let blankLineGap: CGFloat = 4
     static let quoteSpacing = bodyFontSize * 1.2
+    static let mathSpacing = bodyFontSize * 1.2  // .math-display (1.2em)
     static let largeBlockSpacing = bodyFontSize * 1.6  // alerts, tables, mermaid
     /// hr margin-top only. The rule carries no margin-bottom: the following
     /// block's own margin-top provides the space below, so the gaps above and
@@ -297,6 +315,7 @@ nonisolated enum MarkdownHTML {
                        textAlignment: TextAlignmentSetting = .current,
                        warmup: Bool = false,
                        pageTopClearance: CGFloat = 0,
+                       chromeZoom: CGFloat = 1,
                        highlightsCode: Bool = true) -> RenderedHTML {
         let frontmatter = MarkdownFrontmatter.split(markdown)
         let body = frontmatter.body
@@ -419,7 +438,7 @@ nonisolated enum MarkdownHTML {
         let bodyParts = [earlyPopulate, mathBlock.body, mermaidBlock.body, highlightBlock.body]
             .filter { !$0.isEmpty }
         let bodyScripts = bodyParts.isEmpty ? "" : "\n" + bodyParts.joined(separator: "\n")
-        // Warmup keeps the article in layout (so Mermaid's IntersectionObserver
+        // Warmup keeps the article in layout (so the diagram IntersectionObserver
         // still fires and the renderer actually executes) but invisible —
         // otherwise the synthetic diagram flashes on screen before the first
         // real document arrives. `MdPreview.update` clears the inline style.
@@ -468,7 +487,7 @@ nonisolated enum MarkdownHTML {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         \(baseTag)
         <style>\(stylesheet)</style>
-        <style>:root { --mdp-page-top-clearance: \(pageTopClearance)px; }</style>
+        <style>:root { --mdp-page-top-clearance: \(pageTopClearance)px; --mdp-chrome-zoom: \(chromeZoom); }</style>
         \(themeStyleBlock)
         \(scrollOverride)
         \(contentWidthOverride)

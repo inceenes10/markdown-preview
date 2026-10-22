@@ -16,6 +16,8 @@ extension DocumentWindowController {
             return
         }
 
+        split.updateInspectorSelection(nil)
+
         // Edit the complete source. Frontmatter is stripped only by the
         // read-only renderer; the editor must expose and preserve it.
         let editor = split.enterEditMode(
@@ -23,17 +25,26 @@ extension DocumentWindowController {
             assetBaseURL: currentFileURL?.deletingLastPathComponent(),
             autofocus: autofocus
         )
+        invalidateInspectorRefresh()
+        split.onLiveMetadataNeedsRefresh = { [weak self, weak editor] in
+            guard let self, let editor else { return }
+            self.scheduleInspectorRefresh(from: editor)
+        }
         editor.cancelRequested = { [weak self] in
             self?.previewPendingEdits()
         }
-        editor.contentDidChange = { [weak self] in
-            self?.editorChangeRevision += 1
-            self?.hasUnsavedEditorChanges = true
-            self?.stopAutoSaveTimer()
-            self?.startAutoSaveTimerIfNeeded()
+        editor.contentDidChange = { [weak self, weak editor] in
+            guard let self, let editor else { return }
+            self.editorChangeRevision += 1
+            self.pendingInspectorComputation?.cancel()
+            self.hasUnsavedEditorChanges = true
+            self.stopAutoSaveTimer()
+            self.startAutoSaveTimerIfNeeded()
+            self.scheduleInspectorRefresh(from: editor)
         }
-        editor.formattingDidChange = { [weak self] heading, commands in
+        editor.formattingDidChange = { [weak self] heading, commands, selection in
             self?.updateFormattingSelection(heading: heading, commands: commands)
+            self?.mainSplit?.updateInspectorSelection(selection)
         }
         editor.pasteImageRequested = { [weak self] from, to in
             self?.pasteImage(at: from, replacing: to)
@@ -48,6 +59,80 @@ extension DocumentWindowController {
         }
         showEditAccessory()
         updateEditToolbarItem()
+    }
+
+    /// Throttle editor snapshots and refresh only the currently visible panes.
+    private func scheduleInspectorRefresh(from editor: EditorViewController) {
+        guard pendingInspectorRefresh == nil,
+              let split = mainSplit,
+              split.isInspectorVisible
+                || (split.isSidebarVisible && split.sidebarMode == .outline) else { return }
+        let sessionID = inspectorRefreshSessionID
+        let work = DispatchWorkItem { [weak self, weak editor] in
+            guard let self else { return }
+            self.pendingInspectorRefresh = nil
+            guard let editor,
+                  self.inspectorRefreshSessionID == sessionID,
+                  self.mainSplit?.editorViewController === editor else { return }
+
+            let revision = self.editorChangeRevision
+            let fileURL = self.currentFileURL
+            editor.fetchMarkdown { [weak self, weak editor] markdown in
+                guard let self, let editor, let markdown,
+                      self.inspectorRefreshSessionID == sessionID,
+                      self.editorChangeRevision == revision,
+                      self.currentFileURL == fileURL,
+                      self.mainSplit?.editorViewController === editor else { return }
+                self.computeVisibleSidebars(markdown: markdown, fileURL: fileURL,
+                                            revision: revision, sessionID: sessionID)
+            }
+        }
+        pendingInspectorRefresh = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.inspectorRefreshInterval, execute: work)
+    }
+
+    /// Parse immutable editor text off the main thread; touch UI only when the
+    /// result still belongs to the active revision, file, and editing session.
+    private func computeVisibleSidebars(markdown: String, fileURL: URL?,
+                                        revision: Int, sessionID: UUID) {
+        guard let split = mainSplit else { return }
+        let needsOutline = split.isSidebarVisible && split.sidebarMode == .outline
+        let needsMetadata = split.isInspectorVisible
+        guard needsOutline || needsMetadata else { return }
+
+        pendingInspectorComputation?.cancel()
+        let work = DispatchWorkItem { @Sendable [weak self] in
+            let outline = needsOutline ? MarkdownTOC.parse(markdown) : nil
+            let metadata = needsMetadata ? DocumentMetadata.make(url: fileURL, markdown: markdown) : nil
+            DispatchQueue.main.async {
+                guard let self,
+                      self.inspectorRefreshSessionID == sessionID,
+                      self.editorChangeRevision == revision,
+                      self.currentFileURL == fileURL,
+                      self.mainSplit?.editorViewController != nil else { return }
+                self.mainSplit?.applyLiveSidebarUpdates(
+                    outline: outline, metadata: metadata, fileURL: fileURL
+                )
+            }
+        }
+        pendingInspectorComputation = work
+        inspectorComputationQueue.async(execute: work)
+    }
+
+    /// The file URL changed while editing; invalidate old-URL work and read the live editor again.
+    func refreshInspectorAfterRename() {
+        guard let editor = mainSplit?.editorViewController else { return }
+        invalidateInspectorRefresh()
+        scheduleInspectorRefresh(from: editor)
+    }
+
+    private func invalidateInspectorRefresh() {
+        pendingInspectorRefresh?.cancel()
+        pendingInspectorRefresh = nil
+        pendingInspectorComputation?.cancel()
+        pendingInspectorComputation = nil
+        // Also invalidates any WKWebView fetch or background calculation in flight.
+        inspectorRefreshSessionID = UUID()
     }
 
     /// Switches to preview without resolving the editing session. The preview
@@ -348,6 +433,13 @@ extension DocumentWindowController {
             if revision == nil || revision == editorChangeRevision {
                 hasUnsavedEditorChanges = false
             }
+            // Refresh on successful writes as well, so on-disk size and
+            // modification time advance even when edit mode stays open.
+            if revision == nil || revision == editorChangeRevision {
+                computeVisibleSidebars(markdown: body, fileURL: currentFileURL,
+                                       revision: editorChangeRevision,
+                                       sessionID: inspectorRefreshSessionID)
+            }
             completeSuccessfulEditorCommit(exitAfter: exitAfter, rerender: true)
         case let .reloaded(externalMarkdown):
             adoptExternalMarkdown(externalMarkdown,
@@ -361,6 +453,7 @@ extension DocumentWindowController {
     func adoptExternalMarkdown(_ markdown: String,
                               editor: EditorViewController?,
                               exitAfter: Bool) {
+        invalidateInspectorRefresh()
         currentMarkdown = markdown
         editorDraftMarkdown = nil
         editorBaselineMarkdown = isEditing && !exitAfter ? markdown : nil
@@ -437,11 +530,14 @@ extension DocumentWindowController {
             completion()
             return
         }
+        split.updateInspectorSelection(nil)
         split.editorViewController?.contentDidChange = nil
         split.editorViewController?.formattingDidChange = nil
         split.editorViewController?.cancelRequested = nil
         split.editorViewController?.pasteImageRequested = nil
         split.editorViewController?.imageClicked = nil
+        invalidateInspectorRefresh()
+        split.onLiveMetadataNeedsRefresh = nil
         documentWindow.makeFirstResponder(nil)
         let overlayHidden: @MainActor () -> Void = { [weak self] in
             if hidesAccessoryAfterSwap { self?.dismissEditChrome() }

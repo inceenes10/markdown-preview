@@ -70,6 +70,7 @@ final class ContentViewController: NSViewController {
     private static let stickyReleaseFraction: CGFloat = 1.0 / 3.0
 
     var activeHeadingDidChange: ((Int?) -> Void)?
+    var selectedTextDidChange: ((String?) -> Void)?
     var zoomDidChange: ((CGFloat) -> Void)?
     var localMarkdownLinkActivated: ((URL) -> Void)?
     /// Fires once after a pending source scroll anchor (prepared via
@@ -114,6 +115,9 @@ final class ContentViewController: NSViewController {
         webView.fragmentLinkActivated = { [weak self] fragment in
             self?.scrollToElement(id: fragment)
         }
+        webView.selectedTextDidChange = { [weak self] text in
+            self?.selectedTextDidChange?(text)
+        }
         webView.pointerDocumentYDidChange = { [weak self] y in
             guard let self,
                   UserDefaults.standard.bool(forKey: "MarkdownPreview.outlineFollowsPointer") else { return }
@@ -125,8 +129,15 @@ final class ContentViewController: NSViewController {
             self?.localMarkdownLinkActivated?(url)
         }
         webView.zoomDidChange = { [weak self] zoom in
-            self?.webViewCenteredLeadingConstraint?.constant =
-                -MarkdownHTML.preferredPageWidth * zoom / 2
+            // The page relayouts for the new zoom asynchronously. Moving the
+            // column now shows the old layout at the new position for a
+            // frame before the new layout paints, so wait for that paint.
+            // Reads pageZoom then, so a burst of steps lands on the last.
+            self?.webView.afterNextPagePaint { [weak self] in
+                guard let self else { return }
+                webViewCenteredLeadingConstraint?.constant =
+                    -MarkdownHTML.preferredPageWidth * webView.pageZoom / 2
+            }
             self?.zoomDidChange?(zoom)
         }
         webView.scrollDidChange = { [weak self] in

@@ -5,7 +5,9 @@
 // files live under `quick-look/` and `md-preview/` and are symlinked into
 // `Sources/<Target>/` so SPM can compile them without duplication.
 //
-// Run: `swift test --package-path tests/swift-tests`
+// Run: `swift test --package-path tests/swift-tests`. To see how long each
+// test takes, set MDP_TEST_TIMING to a new file path and pass that file to
+// `tests/test-timing-report.py`.
 //
 import PackageDescription
 
@@ -20,9 +22,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "QuickLookHelpers"),
+        // Logs each test's start and end when MDP_TEST_TIMING is set.
+        .target(name: "TestTiming", publicHeadersPath: "."),
         .testTarget(
             name: "QuickLookHelperTests",
-            dependencies: ["QuickLookHelpers"]
+            dependencies: ["QuickLookHelpers", "TestTiming"]
         ),
         .target(
             name: "MarkdownHelpers",
@@ -31,12 +35,12 @@ let package = Package(
             ],
             // Copy real child directories; copying the Vendor symlink itself
             // leaves a dangling relative link with SwiftPM's native build system.
-            resources: ["CodeMirror", "DOMPurify", "Highlight", "KaTeX", "Mermaid", "Morphdom"]
+            resources: ["CodeMirror", "DOMPurify", "Highlight", "KaTeX", "Morphdom", "Pele"]
                 .map { .copy("Vendor/\($0)") }
         ),
         .testTarget(
             name: "MarkdownHelpersTests",
-            dependencies: ["MarkdownHelpers"]
+            dependencies: ["MarkdownHelpers", "TestTiming"]
         ),
     ]
 )

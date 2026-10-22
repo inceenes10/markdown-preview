@@ -10,6 +10,33 @@ import Foundation
 // `nonisolated` matters: the targets default to MainActor isolation, and
 // rendering runs off the main actor.
 nonisolated extension MarkdownHTML {
+    static let mathStylesheet = """
+    .math-display {
+        margin: 1.2em 0 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    .math-display .katex-display {
+        margin: 0;
+    }
+    .math-error {
+        color: #b00020;
+        background: var(--code-bg);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-family: \(codeFontFamily);
+        font-size: 0.88em;
+        white-space: pre-wrap;
+    }
+    :root[data-mdp-color-scheme="dark"] .math-error {
+        color: #ff6e6e;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-mdp-color-scheme="light"]) .math-error { color: #ff6e6e; }
+    }
+    .katex { direction: ltr !important; unicode-bidi: isolate; }
+    """
+
     // Shared document typography, spacing, and controls. Logical positioning
     // keeps lists, quotations, and table alignment consistent in both directions.
     /// The shared document stylesheet plus the code highlighting class rules.
@@ -18,8 +45,103 @@ nonisolated extension MarkdownHTML {
     /// runtime, yet its spans still need their colors.
     static let stylesheet = baseStylesheet + "\n" + highlightThemeCSS + "\n" + tableControlsCSS
 
+    /// Pele's SVG reads its colours from these, so diagrams follow the theme,
+    /// appearance changes and the paper palette without a re-render. Shared by
+    /// the preview's figure and the editor's widget, and resolved into the
+    /// popup's copy.
+    ///
+    /// Tones follow Craft's Beautiful Mermaid recipe: every role is the text
+    /// colour mixed into the background at a fixed weight (secondary text
+    /// 60%, lines 50%, borders 20%, group tint 5%, node tint 3%), so each
+    /// theme preset gets a coherent mono hierarchy in its own colours. The
+    /// background is the code-block tray (`--code-bg`), the link colour stays
+    /// the one accent, and chart series reuse the code highlighting palette,
+    /// which already has light and dark values.
+    static let diagramColorVariables: [(name: String, value: String)] = [
+        ("--pele-bg", "var(--code-bg)"),
+        ("--pele-fg", "var(--text)"),
+        ("--pele-muted", "color-mix(in srgb, var(--text) 60%, var(--code-bg))"),
+        ("--pele-line", "color-mix(in srgb, var(--text) 50%, var(--code-bg))"),
+        ("--pele-surface", "color-mix(in srgb, var(--text) 3%, var(--code-bg))"),
+        ("--pele-surface-alt", "color-mix(in srgb, var(--text) 5%, var(--code-bg))"),
+        ("--pele-border", "color-mix(in srgb, var(--text) 20%, var(--code-bg))"),
+        ("--pele-accent", "var(--link)"),
+        ("--pele-critical", "var(--hl-string)"),
+        // Series 2 is magenta so the first two slices stay apart whatever
+        // hue the theme's accent has (Calm's is amber, like --hl-attribute).
+        ("--pele-series-1", "var(--link)"),
+        ("--pele-series-2", "var(--hl-keyword)"),
+        ("--pele-series-3", "var(--hl-variable)"),
+        ("--pele-series-4", "var(--hl-attribute)"),
+        ("--pele-series-5", "var(--hl-string)"),
+        ("--pele-series-6", "var(--hl-type)"),
+        ("--pele-series-7", "var(--hl-preprocessor)"),
+        ("--pele-series-8", "var(--hl-comment)"),
+    ]
+    /// Non-colour inputs, sent to the popup as these literal values: weights
+    /// match table headers and alert titles, and the radius sits between
+    /// inline code (5px) and code blocks (8px).
+    static let diagramStyleVariables: [(name: String, value: String)] = [
+        ("--pele-radius", "6px"),
+        ("--pele-title-weight", "600"),
+        ("--pele-heading-weight", "600"),
+        ("--pele-font-mono", codeFontFamily),
+    ]
+    /// The theme's document font, or the system body stack.
+    static let documentFontFamilyCSS = "var(--mdp-doc-font, \(bodyFontFamily))"
+    /// Pele draws labels in `--pele-font`, falling back to generic sans-serif
+    /// (Helvetica in WebKit) while it measures them in `fontFamily` below.
+    /// Not a literal popup input: the popup resolves it from the page.
+    static let diagramFontVariableCSS = "--pele-font: \(documentFontFamilyCSS);"
+    static let diagramVariablesCSS = (diagramColorVariables + diagramStyleVariables)
+        .map { "\($0.name): \($0.value);" }
+        .joined(separator: "\n") + "\n" + diagramFontVariableCSS
+    static let diagramColorVariableNamesJS = "["
+        + diagramColorVariables.map { javaScriptStringLiteral($0.name) }.joined(separator: ", ") + "]"
+    static let diagramStyleVariablesJS = "{"
+        + diagramStyleVariables
+            .map { "\(javaScriptStringLiteral($0.name)): \(javaScriptStringLiteral($0.value))" }
+            .joined(separator: ", ") + "}"
+
+    /// Options every `pele.render` call shares, in the preview and the editor.
+    /// Copying the object reads the body's font and size, so theme changes
+    /// reach the next diagram (Pele draws flowchart labels at `fontSize`,
+    /// class and sequence text at 0.875 of it). It keeps the author's
+    /// flowchart direction: the figure scales and zooms instead of re-laying
+    /// out for a narrow window.
+    static let diagramRenderOptionsJS = """
+    { autoDirection: false,
+      get fontFamily() { return getComputedStyle(document.body).fontFamily; },
+      get fontSize() { return parseFloat(getComputedStyle(document.body).fontSize); } }
+    """
+
+    /// Inset between a diagram and its tray, in both modes.
+    static let diagramStagePadding = 16
+    /// Tray geometry shared by the preview figure and the editor widget. The
+    /// tray spans the column like a code block; its height follows the
+    /// diagram's aspect ratio, capped by the window and by the diagram's own
+    /// height plus the stage padding, so a diagram narrower than the column
+    /// draws at its natural size instead of scaling up to the width.
+    static let diagramFigureSizingCSS = """
+    --mm-max-height: min(70vh, 720px);
+    width: 100%;
+    aspect-ratio: var(--mm-aspect, 4 / 3);
+    max-height: min(var(--mm-max-height), calc(var(--mm-height, var(--mm-max-height)) + \(2 * diagramStagePadding)px));
+    """
+
+    /// Text shown in a diagram's place (an error, or an empty block), shared
+    /// by the preview and the editor widget so both modes match.
+    static let diagramMessageCSS = """
+    padding: 12px 16px;
+    text-align: start;
+    white-space: pre-wrap;
+    font-family: \(codeFontFamily);
+    font-size: 0.88em;
+    """
+
     static let tableControlsCSS = """
-    .md-table-wrap { position: relative; margin-top: \(largeBlockSpacing)px; padding-top: 28px; }
+    /* Shrink to the table so the Expand button sits at the table's edge, not the column's. */
+    .md-table-wrap { position: relative; margin-top: \(largeBlockSpacing)px; padding-top: 28px; width: fit-content; max-width: 100%; }
     .md-table-wrap > table { margin-top: 0; }
     .md-table-actions { display: flex; justify-content: flex-end; height: 28px; }
     .md-table-wrap > .md-table-actions { position: absolute; top: 0; inset-inline-end: 0; }
@@ -30,7 +152,7 @@ nonisolated extension MarkdownHTML {
     }
     .md-table-expand:hover { background: var(--code-bg); color: var(--text); }
     .md-table-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-    th code, td code, .cm-md-table-cell .cm-md-inline-code { overflow-wrap: inherit; word-break: normal; }
+    th code, td code, .cm-md-table-cell .cm-md-inline-code { overflow-wrap: inherit; word-break: inherit; }
     html.\(previewPrintClass) .md-table-actions { display: none; }
     html.\(previewPrintClass) .md-table-wrap { padding-top: 0; }
     @media print {
@@ -38,6 +160,11 @@ nonisolated extension MarkdownHTML {
         .md-table-wrap { padding-top: 0; }
     }
     """
+
+    /// One gutter rule per `data-mdp-digits` value the formatter can emit.
+    private static let markerGutterRules = (3...EscapingHTMLFormatter.maximumMarkerDigits).map { digits in
+        "ol[data-mdp-digits=\"\(digits)\"] { --mdp-list-indent: calc(2.1em + \(digits - 2)ch); }"
+    }.joined(separator: "\n    ")
 
     private static let baseStylesheet = """
     :root {
@@ -47,7 +174,8 @@ nonisolated extension MarkdownHTML {
            below both get the right appearance without a second palette, and
            labels and separators follow increased-contrast settings.
            Accent colors follow the theme's link color. */
-        --text: -apple-system-label;
+        \(textColorCSS)
+        \(quoteIndentCSS)
         --secondary: -apple-system-secondary-label;
         --tertiary: -apple-system-tertiary-label;
         --quote-border: -apple-system-quaternary-label;
@@ -153,7 +281,7 @@ nonisolated extension MarkdownHTML {
         height: 0;
     }
     body {
-        font-family: var(--mdp-doc-font, \(bodyFontFamily));
+        font-family: \(documentFontFamilyCSS);
         font-size: \(bodyFontSize)px;
         font-weight: var(--mdp-body-weight, 400);
         line-height: var(--mdp-line-height, \(bodyLineHeight));
@@ -163,6 +291,7 @@ nonisolated extension MarkdownHTML {
         background: transparent;
         padding: calc((\(pagePaddingTop)px + var(--mdp-page-top-clearance, 0px)) / var(--mdp-chrome-zoom, 1)) var(--mdp-page-padding, \(pagePaddingHorizontal)px) \(pagePaddingBottom)px;
         -webkit-font-smoothing: antialiased;
+        \(bodyTextRenderingCSS)
     }
     /* Reader spacing tweaks stop at code — whitespace fidelity wins. */
     pre, code {
@@ -426,8 +555,7 @@ nonisolated extension MarkdownHTML {
         padding: 0;
         background: transparent;
         border: 0;
-        /* Block code reads at the body size; only inline code steps down. */
-        font-size: 1em;
+        \(codeBlockTypeCSS)
     }
     .md-code-wrap {
         position: relative;
@@ -463,27 +591,18 @@ nonisolated extension MarkdownHTML {
     .md-code-action:focus-visible { outline: 2px solid AccentColor; outline-offset: 1px; }
     .mermaid-figure {
         position: relative;
-        margin: \(largeBlockSpacing)px auto 0;
+        margin: \(largeBlockSpacing)px 0 0;
         background: var(--code-bg);
         border-radius: 15px;
         overflow: hidden;
         outline: none;
-        /* The stage is absolutely positioned, so the figure has no width of
-           its own. Left to its auto margins inside the article's flex column
-           it shrinks to 0 wide, and the aspect ratio then makes it 0 tall.
-           The max-width is the height cap carried through the aspect ratio,
-           which block layout derived by itself: a tall diagram narrows and
-           stays centred rather than filling the column with empty sides. */
-        --mm-max-height: min(70vh, 720px);
-        width: 100%;
-        max-width: calc(var(--mm-max-height) * (var(--mm-aspect, 4 / 3)));
-        aspect-ratio: var(--mm-aspect, 4 / 3);
-        max-height: var(--mm-max-height);
+        /* The stage is absolutely positioned, so the figure needs an explicit
+           width; a tall diagram stays centred inside the height cap. */
+        \(diagramFigureSizingCSS)
         contain: layout paint;
+        \(diagramVariablesCSS)
     }
     .mermaid-figure.mermaid-width-expanded {
-        width: 100%;
-        max-width: none;
         max-height: none;
     }
     .mermaid-figure:focus-visible {
@@ -503,7 +622,7 @@ nonisolated extension MarkdownHTML {
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 16px;
+        padding: \(diagramStagePadding)px;
         box-sizing: border-box;
     }
     .mermaid svg {
@@ -563,6 +682,15 @@ nonisolated extension MarkdownHTML {
     .mermaid-hud-btn:active {
         background: color-mix(in srgb, var(--text) 18%, transparent);
     }
+    /* −, + and ⛶ draw about 1px below the middle of the text box (− and +
+       sit on the font's maths axis); shift them up inside the same button
+       box, measured centred to a quarter point. */
+    .mermaid-hud-btn[data-mm-act="out"],
+    .mermaid-hud-btn[data-mm-act="in"],
+    .mermaid-hud-btn[data-mm-act="popup"] {
+        padding-top: 4px;
+        padding-bottom: 6px;
+    }
     .mermaid-hud-level {
         min-width: 46px;
         font-variant-numeric: tabular-nums;
@@ -582,45 +710,32 @@ nonisolated extension MarkdownHTML {
     @media (prefers-reduced-motion: reduce) {
         .mermaid-hud { transition: none; }
     }
-    .mermaid-error {
-        position: static;
+    /* A diagram that cannot be drawn shows the message and its source in
+       flow, so the figure sizes to the text instead of the aspect ratio. */
+    .mermaid-figure.mermaid-error {
         aspect-ratio: auto;
-        padding: 12px 16px;
-        text-align: left;
-        white-space: pre-wrap;
-        font-family: \(codeFontFamily);
-        font-size: 0.88em;
+        max-width: none;
+        max-height: none;
     }
-    .math-display {
-        margin: 1.2em 0 0;
-        overflow-x: auto;
-        overflow-y: hidden;
+    .mermaid-figure.mermaid-error .mermaid-stage {
+        position: static;
+        contain: none;
     }
-    .math-display .katex-display {
-        margin: 0;
+    .mermaid-figure.mermaid-error .mermaid-hud { display: none; }
+    .mermaid-figure.mermaid-error .mermaid {
+        position: static;
+        display: block;
+        \(diagramMessageCSS)
     }
-    .math-error {
-        color: #b00020;
-        background: var(--code-bg);
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-family: \(codeFontFamily);
-        font-size: 0.88em;
-        white-space: pre-wrap;
-    }
-    :root[data-mdp-color-scheme="dark"] .math-error {
-        color: #ff6e6e;
-    }
-    @media (prefers-color-scheme: dark) {
-        :root:not([data-mdp-color-scheme="light"]) .math-error { color: #ff6e6e; }
-    }
-    .katex { direction: ltr !important; unicode-bidi: isolate; }
+    /* An empty block is a placeholder, not content. */
+    .mermaid-figure.mermaid-empty .mermaid { color: var(--secondary); }
+    \(mathStylesheet)
 
     blockquote {
         position: relative;
         margin: \(quoteSpacing)px 0 0;
         padding: 0.4em 1em;
-        padding-inline-start: 1.5em;
+        padding-inline-start: var(--mdp-quote-indent);
         color: var(--secondary);
     }
     blockquote::before {
@@ -670,11 +785,29 @@ nonisolated extension MarkdownHTML {
     .markdown-alert-caution .markdown-alert-title { color: #d1242f; }
 
     ul, ol {
+        /* Each list owns its gutter, so a nested list does not inherit the
+           wider gutter of a long ordered list around it. */
+        --mdp-list-indent: 2.1em;
         margin: \(paragraphSpacing)px 0 0;
         padding-inline-start: var(--mdp-list-indent);
         padding-inline-end: 0;
     }
+    /* A two-digit marker fits the default gutter; from "100." on, the
+       formatter tags the list with its digit count and the gutter grows by one
+       digit per extra digit. 1ch is the width of "0", which no document font
+       renders narrower than its tabular digits, so the marker never wraps or
+       hangs past the page edge. The editor mirrors this in entry-cm.js. */
+    \(markerGutterRules)
     ol > li::marker { color: var(--link); font-variant-numeric: tabular-nums; }
+    /* A numbered item that opens with a diagram has no text line for its
+       ::marker (the drawing is absolutely positioned), so the number never
+       painted. A zero-height first line gives it one without moving the
+       diagram; bulleted items paint their own dot in ::before. */
+    ol > li:has(> .mermaid-figure:first-child)::before {
+        content: "\u{200B}";
+        display: block;
+        height: 0;
+    }
     /* No text marker: it would paint as a selected box beside every item.
        The gutter comes from the list padding, a 0.4em circle is painted in
        its place, and copying a list yields its Markdown source, bullets
@@ -698,41 +831,34 @@ nonisolated extension MarkdownHTML {
     li > p:first-child { margin-top: 0; }
 
     li.task-list-item { list-style: none; }
-    /* Completed tasks read as done — struck through and muted. */
-    li.task-list-item:has(input.task-list-item-checkbox:checked) {
-        color: var(--secondary);
-        text-decoration: line-through;
+    /* Completed tasks read as done by muting, without a strikethrough, so a
+       long checklist stays legible. The mute stops short of --secondary so
+       the text stays readable beside its checkbox. Only the item's own
+       checkbox counts, and nested lists keep their own state: a checked
+       sub-item must not mark its parent done, and a checked parent must not
+       mute unchecked sub-items. */
+    li.task-list-item:has(> input.task-list-item-checkbox:checked) > :not(ul, ol) {
+        color: color-mix(in srgb, var(--secondary), var(--text) 30%);
     }
     li.task-list-item > p:first-of-type { display: inline; margin-top: 0; }
+    /* The system draws the box, so it matches every other macOS checkbox:
+       accent colour, dark mode, and the grey tick of an inactive window.
+       Left to itself WebKit draws it 12px square at any font-size, which
+       reads tiny beside body text; an explicit size scales the system
+       drawing, so it is sized in em like the text. Its baseline does not
+       scale with the text, so it is centred with `middle` (half the
+       x-height) and moved up to half the cap height instead. */
     .task-list-item-checkbox {
-        -webkit-appearance: none;
-        appearance: none;
         font: inherit;
-        width: 0.9em;
-        height: 0.9em;
+        width: 1.1em;
+        height: 1.1em;
         margin: 0;
-        margin-inline-start: calc(-0.9em - 0.25em);
+        margin-inline-start: calc(-1.1em - 0.25em);
         margin-inline-end: 0.25em;
-        vertical-align: calc(0.5cap - 0.45em);
-        border: 1.5px solid var(--grid);
-        border-radius: 25%;
-        background: transparent;
+        vertical-align: middle;
         position: relative;
+        top: calc(0.5ex - 0.5cap);
         flex: 0 0 auto;
-    }
-    .task-list-item-checkbox:checked {
-        border-color: var(--accent);
-        background: var(--accent);
-    }
-    .task-list-item-checkbox:not(:disabled) { cursor: pointer; }
-    .task-list-item-checkbox:checked::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.4 8.4 L7 11 L11.6 5.4" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: 100% 100%;
     }
 
     table {
@@ -749,6 +875,12 @@ nonisolated extension MarkdownHTML {
         text-align: start;
         vertical-align: top;
     }
+    /* Chinese and Japanese have no spaces, so a cell's min-content width is
+       otherwise one character and short labels wrap two or three characters
+       per line. keep-all keeps CJK runs whole; the renderer adds <wbr> after
+       CJK punctuation in Markdown cells so long text still wraps by phrase.
+       Latin text is unaffected. Raw HTML tables keep the default. */
+    :is(th, td)[data-table-row] { word-break: keep-all; }
     th { font-weight: 600; }
     :is(th, td)[align="center"] { text-align: center; }
     :is(th, td)[align="right"] { text-align: right; }

@@ -37,7 +37,8 @@ nonisolated enum EditorHTML {
         :root {
             color-scheme: light dark;
             /* Semantic system colors resolve per appearance on their own. */
-            --text: -apple-system-label;
+            \(MarkdownHTML.textColorCSS)
+            \(MarkdownHTML.quoteIndentCSS)
             --secondary: -apple-system-secondary-label;
             --quote-border: -apple-system-quaternary-label;
             --grid: -apple-system-separator;
@@ -73,10 +74,29 @@ nonisolated enum EditorHTML {
             line-height: \(MarkdownHTML.bodyLineHeight);
             color: var(--text);
             -webkit-font-smoothing: antialiased;
+            \(MarkdownHTML.bodyTextRenderingCSS)
+        }
+        /* The body em as a computed length: a line's own em shrinks on code
+           lines (0.9em), but a list indent on that line must keep the text
+           column, as the preview's list item does around its pre. */
+        @property --mdp-body-em {
+            syntax: "<length>";
+            inherits: true;
+            initial-value: \(MarkdownHTML.bodyFontSize)px;
         }
         #editor {
             height: 100%;
             box-sizing: border-box;
+        }
+        \(MarkdownHTML.mathStylesheet)
+        /* Source separator lines own block spacing in CodeMirror. */
+        #editor .math-display { margin-top: 0; }
+        /* Nested math shares a CodeMirror line with the hidden quote/list
+           prefix. A block-level div would add empty line boxes around it. */
+        #editor .cm-line .math-display {
+            display: inline-block;
+            width: 100%;
+            vertical-align: top;
         }
         .cm-editor { height: 100%; outline: none; }
         .cm-editor.cm-focused { outline: none; }
@@ -99,6 +119,7 @@ nonisolated enum EditorHTML {
             line-height: \(MarkdownHTML.bodyLineHeight);
         }
         #editor .cm-content {
+            --mdp-body-em: 1em;
             width: 100%;
             max-width: \(columnMaxWidth);
             min-height: 100%;
@@ -206,7 +227,8 @@ nonisolated enum EditorHTML {
            rule per nesting level as background images (positions inline).
            The rule stops above the block gap the bundle adds when another
            block follows the quotation without a blank line. */
-        #editor .cm-content > .cm-line.cm-md-quote {
+        #editor .cm-content > .cm-line.cm-md-quote,
+        #editor .cm-md-code-card > .cm-line.cm-md-quote {
             padding-inline-end: 1em;
             padding-top: var(--cm-md-quote-top);
             padding-bottom: calc(var(--cm-md-quote-bottom) + var(--cm-md-block-gap, 0px));
@@ -284,8 +306,7 @@ nonisolated enum EditorHTML {
             text-indent: -2.1em;
         }
         .cm-md-task-completed {
-            color: var(--secondary);
-            text-decoration: line-through;
+            color: color-mix(in srgb, var(--secondary), var(--text) 30%);
         }
         #editor .cm-md-task-line {
             text-indent: 0 !important;
@@ -293,34 +314,17 @@ nonisolated enum EditorHTML {
         .cm-md-task-marker {
             display: inline;
         }
+        /* The system draws the box, as in the preview. */
         .cm-md-task-marker input {
-            appearance: none;
-            -webkit-appearance: none;
             font: inherit;
-            width: 0.9em;
-            height: 0.9em;
+            width: 1.1em;
+            height: 1.1em;
             margin: 0;
-            margin-inline-start: calc(-0.9em - 0.25em);
+            margin-inline-start: calc(-1.1em - 0.25em);
             margin-inline-end: 0.25em;
-            vertical-align: calc(0.5cap - 0.45em);
-            border: 1.5px solid var(--grid);
-            border-radius: 25%;
-            background: transparent;
+            vertical-align: middle;
             position: relative;
-            cursor: pointer;
-        }
-        .cm-md-task-marker input:checked {
-            border-color: var(--accent);
-            background: var(--accent);
-        }
-        .cm-md-task-marker input:checked::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.4 8.4 L7 11 L11.6 5.4" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
-            background-repeat: no-repeat;
-            background-position: center;
-            background-size: 100% 100%;
+            top: calc(0.5ex - 0.5cap);
         }
         .cm-md-bullet {
             display: inline-block;
@@ -337,11 +341,13 @@ nonisolated enum EditorHTML {
         .cm-md-bullet::after {
             content: "";
             position: absolute;
-            /* Match the preview's 0.75em gap between the circle and the
-               item text. */
-            inset-inline-end: 0.75em;
-            top: 50%;
-            transform: translateY(-50%);
+            /* Place the 0.4em circle the way the preview does: from its start
+               edge, 0.75em before the item text, and centred by layout, not a
+               transform. Both edges and a transform reach the same spot but
+               round to different device pixels, so the dot seemed to shift
+               when switching modes. */
+            inset-inline-start: calc(100% - 1.15em);
+            top: calc(50% - 0.2em);
             width: 0;
             height: 0;
             border: 0.2em solid var(--link);
@@ -361,7 +367,9 @@ nonisolated enum EditorHTML {
         }
         /* Ordered markers share the bullet's hanging box: right-aligned,
            tabular digits, accent color; the active source marker keeps the
-           same box so item text never moves. */
+           same box so item text never moves. From three digits on, entry-cm.js
+           widens the box and the line's hanging indent inline by 1ch per extra
+           digit, matching the preview's `ol[data-mdp-digits]` gutter. */
         .cm-md-ordered,
         .cm-md-ordered-source {
             display: inline-block;
@@ -372,6 +380,12 @@ nonisolated enum EditorHTML {
             box-sizing: border-box;
             font-variant-numeric: tabular-nums;
         }
+        /* The preview's ::marker ends "1." one marker space before the text;
+           0.25em puts the number on the same pixels. The active source hides
+           its trailing space, so it takes the same padding and the number
+           does not move when the caret enters or leaves the line. */
+        .cm-md-ordered,
+        .cm-md-ordered-source { padding-inline-end: 0.25em; }
         .cm-md-ordered { color: var(--link); }
         .cm-md-ordered-source { color: var(--secondary); }
         /* Continuation lines of an item keep the depth padding but no hanging
@@ -411,8 +425,7 @@ nonisolated enum EditorHTML {
         }
         #editor .cm-md-codeblock {
             font-family: ui-monospace, "SF Mono", Menlo, monospace;
-            font-size: 1em;
-            line-height: 1.3;
+            \(MarkdownHTML.codeBlockTypeCSS)
             position: relative;
             padding: 0;
             white-space: pre;
@@ -528,22 +541,19 @@ nonisolated enum EditorHTML {
             /* Outer spacing comes from the block separator lines, matching
                the preview's .mermaid-figure margin. */
             position: relative;
-            margin: 0 auto;
-            width: 100%;
-            --mm-max-height: min(70vh, 720px);
-            max-width: calc(var(--mm-max-height) * (var(--mm-aspect, 4 / 3)));
-            aspect-ratio: var(--mm-aspect, 4 / 3);
-            max-height: var(--mm-max-height);
+            margin: 0;
+            \(MarkdownHTML.diagramFigureSizingCSS)
             overflow: hidden;
             border-radius: 15px;
             background: var(--code-bg);
             cursor: text;
             box-sizing: border-box;
+            \(MarkdownHTML.diagramVariablesCSS)
         }
         .cm-md-mermaid-stage {
             position: absolute;
             inset: 0;
-            padding: 16px;
+            padding: \(MarkdownHTML.diagramStagePadding)px;
             box-sizing: border-box;
             display: flex;
             align-items: center;
@@ -559,6 +569,25 @@ nonisolated enum EditorHTML {
         .cm-md-mermaid-error {
             border: 1px solid color-mix(in srgb, #d1242f 45%, transparent);
         }
+        /* No drawing gives the box no size of its own: lay the message out in
+           flow so the box spans the column and stays easy to click. */
+        .cm-md-mermaid-preview.cm-md-mermaid-message {
+            aspect-ratio: auto;
+            max-height: none;
+        }
+        .cm-md-mermaid-message .cm-md-mermaid-stage {
+            position: static;
+            display: block;
+            \(MarkdownHTML.diagramMessageCSS)
+        }
+        /* The marker line of a list item that opens with a diagram stands in
+           for the preview's figure margin under the marker. */
+        #editor .cm-content > .cm-line.cm-md-diagram-marker-line {
+            height: \(MarkdownHTML.largeBlockSpacing)px;
+        }
+        /* A diagram nested in a quote or list: the bundle sets the indent,
+           padding and one quote bar per level, as on quote and list lines. */
+        .cm-md-mermaid-nest { background-repeat: no-repeat; }
         \(MarkdownHTML.tableControlsCSS)
         .cm-md-table {
             font-family: ui-monospace, "SF Mono", Menlo, monospace;
@@ -606,9 +635,13 @@ nonisolated enum EditorHTML {
             outline: none;
             white-space: pre-wrap;
             overflow-wrap: normal;
-            word-break: normal;
+            /* Keep short CJK labels whole, like the reader. The rendered cell
+               carries <wbr> after CJK punctuation; the Markdown source shown
+               while editing does not, so it wraps normally. */
+            word-break: keep-all;
             cursor: text;
         }
+        .cm-md-table-cell[data-table-editing] { word-break: normal; }
         .cm-md-table-grid th .cm-md-table-cell[data-placeholder]:empty::before {
             content: attr(data-placeholder);
             color: var(--secondary);
@@ -656,24 +689,46 @@ nonisolated enum EditorHTML {
         <body>
         <div id="editor"></div>
         \(includesMermaid ? "<script>\(mermaidJavaScript)</script>" : "")
-        \(includesMermaid ? """
         <script>
-        if (window.mermaid) {
-            window.mermaid.initialize({
-                startOnLoad: false,
-                securityLevel: "strict",
-                theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default"
-            });
-        }
+        \(MarkdownHTML.mathElementRenderer)
+        window.__mdRenderMathElement = renderMathElement;
+        // Loaded once, on the first rendered formula, including newly typed math.
+        window.__mdLoadMath = function () {
+            if (!window.__mdMathLoading) {
+                const loaded = (element) => new Promise((resolve, reject) => {
+                    element.onload = resolve;
+                    element.onerror = reject;
+                    document.head.appendChild(element);
+                });
+                const css = document.createElement('link');
+                css.rel = 'stylesheet';
+                css.href = '\(MarkdownAssetScheme.vendorURL("katex.min.css"))';
+                const script = document.createElement('script');
+                script.src = '\(MarkdownAssetScheme.vendorURL("katex.min.js"))';
+                window.__mdMathLoading = Promise.all([loaded(css), loaded(script)]).catch((error) => {
+                    css.remove();
+                    script.remove();
+                    window.__mdMathLoading = null;
+                    throw error;
+                });
+            }
+            return window.__mdMathLoading;
+        };
         </script>
-        """ : "")
         <script>\(editorJavaScript)</script>
         <script>
         (function () {
             const post = function (m) {
                 try { window.webkit.messageHandlers.\(configuration.bridgeName).postMessage(m); } catch (e) {}
             };
+            window.__mdDiagramRenderOptions = \(MarkdownHTML.diagramRenderOptionsJS);
+            window.__mdDiagramMessages = (() => {
+                const messages = \(MarkdownHTML.diagramMessagesJS);
+                messages.forError = \(MarkdownHTML.diagramErrorMessageJS);
+                return messages;
+            })();
             window.__mdTableExpandLabel = \(jsStringLiteral(NSLocalizedString("Expand Table", comment: "Open a table in full screen")));
+            window.__mdMathEditLabel = \(jsStringLiteral(NSLocalizedString("Math formula. Click to edit source.", comment: "Accessibility label for a rendered equation in the editor")));
             window.__mdOpenTablePopup = function (markdown) { post({kind: "tablePopup", markdown}); };
             window.__mdRequestTableContextMenu = function (details) {
                 post(Object.assign({ kind: "tableContextMenu" }, details));
@@ -703,7 +758,8 @@ nonisolated enum EditorHTML {
                         onDirty: function () { post("dirty"); },
                         onCopyCode: function (text) { post({ kind: "copyCode", value: text }); },
                         onFormattingChange: function (state) {
-                            post({ kind: "formattingState", heading: state.heading, commands: state.commands });
+                            post({ kind: "formattingState", heading: state.heading, commands: state.commands,
+                                   selectedText: state.selectedText });
                         },
                         onSearchChange: function (result) {
                             post({ kind: "findResult", index: result.index, total: result.total });
@@ -717,6 +773,7 @@ nonisolated enum EditorHTML {
                             line: \(MarkdownHTML.sourceLineHeight),
                             blankGap: \(MarkdownHTML.blankLineGap),
                             paragraph: \(MarkdownHTML.paragraphSpacing),
+                            math: \(MarkdownHTML.mathSpacing),
                             quote: \(MarkdownHTML.quoteSpacing),
                             alert: \(MarkdownHTML.largeBlockSpacing),
                             table: \(MarkdownHTML.largeBlockSpacing),

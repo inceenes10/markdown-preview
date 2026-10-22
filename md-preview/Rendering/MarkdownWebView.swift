@@ -193,6 +193,7 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
     /// finishes. Unlike heightDidChange, this also fires when the new
     /// document happens to lay out at the same height as the old one.
     var contentDidReplace: (() -> Void)?
+    var selectedTextDidChange: ((String?) -> Void)?
     var taskCheckboxToggled: ((Int, Bool) -> Void)?
     var zoomDidChange: ((CGFloat) -> Void)?
     var fragmentLinkActivated: ((String) -> Void)?
@@ -331,12 +332,14 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         let markdown = Self.warmupMarkdown
         let contentWidth = ContentWidthSetting.current.renderWidth
         let themeOverrides = Self.currentThemeOverrides()
+        let chromeZoom = chromeZoom
         Task { @concurrent [weak self] in
             let rendered = Self.timedRender(label: "warmup",
                                             markdown: markdown,
                                             assetBaseHref: baseHref,
                                             contentWidth: contentWidth,
                                             themeOverrides: themeOverrides,
+                                            chromeZoom: chromeZoom,
                                             warmup: true)
             await self?.applyWarmup(rendered)
         }
@@ -378,7 +381,14 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
     /// WebKit "experimental features", reached through private selectors, so
     /// every call is guarded and `MarkdownPreview.gpuProcessRendering YES`
     /// restores the default.
+    ///
+    /// macOS 27's WebKit no longer paints a page whose DOM rendering is kept
+    /// out of the GPU process: the reading view stayed blank while the
+    /// editor, which does not set these flags, rendered (#529). The flags are
+    /// still accepted there, so the opt-out is skipped by OS version rather
+    /// than by their presence.
     private static func keepDOMRenderingInWebContentProcess(in preferences: WKPreferences) {
+        if #available(macOS 27, *) { return }
         guard !UserDefaults.standard.bool(forKey: "MarkdownPreview.gpuProcessRendering") else { return }
         typealias Setter = @convention(c) (AnyObject, Selector, Bool, AnyObject) -> Void
         let groups: [(list: String, setter: String, keys: Set<String>)] = [
@@ -455,12 +465,14 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         let generation = renderGeneration
         let contentWidth = ContentWidthSetting.current.renderWidth
         let themeOverrides = Self.currentThemeOverrides()
+        let chromeZoom = chromeZoom
         if renderImmediately, markdown.utf8.count <= Self.immediateRenderByteLimit {
             let rendered = Self.timedRender(label: "display",
                                             markdown: markdown,
                                             assetBaseHref: baseHref,
                                             contentWidth: contentWidth,
-                                            themeOverrides: themeOverrides)
+                                            themeOverrides: themeOverrides,
+                                            chromeZoom: chromeZoom)
             applyDisplay(rendered, generation: generation)
             return
         }
@@ -469,7 +481,8 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
                                             markdown: markdown,
                                             assetBaseHref: baseHref,
                                             contentWidth: contentWidth,
-                                            themeOverrides: themeOverrides)
+                                            themeOverrides: themeOverrides,
+                                            chromeZoom: chromeZoom)
             #if DEBUG
             let renderFinishedAt = DispatchTime.now().uptimeNanoseconds
             await self?.applyDisplayDebug(
@@ -491,6 +504,7 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
                                                 assetBaseHref: String,
                                                 contentWidth: MarkdownHTML.ContentWidth,
                                                 themeOverrides: MarkdownHTML.ThemeOverrides? = nil,
+                                                chromeZoom: CGFloat,
                                                 warmup: Bool = false) -> MarkdownHTML.RenderedHTML {
         let t0 = DispatchTime.now()
         let rendered = MarkdownHTML.render(markdown: markdown,
@@ -500,7 +514,8 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
                                            contentWidth: contentWidth,
                                            themeOverrides: themeOverrides,
                                            warmup: warmup,
-                                           pageTopClearance: MarkdownHTML.appPageTopClearance)
+                                           pageTopClearance: MarkdownHTML.appPageTopClearance,
+                                           chromeZoom: chromeZoom)
         let elapsedMs = Int(
             (Double(DispatchTime.now().uptimeNanoseconds - t0.uptimeNanoseconds)
              / 1_000_000).rounded()
@@ -569,6 +584,10 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
             }
             return
         }
+
+        // A full page load drops any selection in the old page without a
+        // selectionchange, and the new page starts with no selection.
+        selectedTextDidChange?(nil)
 
         #if DEBUG
         let loadStartedAt = DispatchTime.now().uptimeNanoseconds
@@ -662,6 +681,9 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         case "pointerPosition":
             guard let value = dict["value"] as? NSNumber else { return }
             pointerDocumentYDidChange?(CGFloat(truncating: value))
+        case "selectedText":
+            guard dict["value"] is String || dict["value"] is NSNull else { return }
+            selectedTextDidChange?(dict["value"] as? String)
         case "linkContextMenu":
             guard let raw = dict["url"] as? String, let url = URL(string: raw) else { return }
             showLinkContextMenu(url)
@@ -853,9 +875,32 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         }
     }
 
+    /// Runs `body` once the page's next paint is on screen. Native changes
+    /// that must land together with a web-process relayout (such as a
+    /// pageZoom change) wait for this; applied immediately, they show up a
+    /// frame before the page catches up. A page-side requestAnimationFrame
+    /// round trip still landed a frame early or late, so this uses WebKit's
+    /// private presentation-update hook and runs `body` at once without it.
+    func afterNextPagePaint(_ body: @escaping () -> Void) {
+        let selector = NSSelectorFromString("_doAfterNextPresentationUpdate:")
+        guard webView.responds(to: selector) else { body(); return }
+        typealias Method = @convention(c) (AnyObject, Selector, @escaping @convention(block) () -> Void) -> Void
+        let method = unsafeBitCast(webView.method(for: selector), to: Method.self)
+        method(webView, selector, body)
+    }
+
+    /// The page zoom the top padding divides by, so the chrome clearance
+    /// stays the same size at every zoom. Rendered into each page: set only
+    /// after load, the first frame of a zoomed page drew the padding at the
+    /// zoomed size and the text jumped when the value arrived.
+    private var chromeZoom: CGFloat {
+        guard #available(macOS 26.0, *) else { return 1 }
+        return max(webView.pageZoom, 0.001)
+    }
+
     private func updateChromeZoom() {
         guard #available(macOS 26.0, *) else { return }
-        webView.evaluateJavaScript("document.documentElement.style.setProperty('--mdp-chrome-zoom', '\(max(webView.pageZoom, 0.001))')", completionHandler: nil)
+        webView.evaluateJavaScript("document.documentElement.style.setProperty('--mdp-chrome-zoom', '\(chromeZoom)')", completionHandler: nil)
     }
 
     private func clampedZoom(_ value: CGFloat) -> CGFloat {

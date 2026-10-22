@@ -2,8 +2,90 @@ import WebKit
 import XCTest
 @testable import MarkdownHelpers
 
+private final class InspectorSelectionRecorder: NSObject, WKScriptMessageHandler {
+    var selectedTexts: [String?] = []
+
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        guard let payload = message.body as? [String: Any],
+              payload["kind"] as? String == "formattingState" else { return }
+        selectedTexts.append(payload["selectedText"] as? String)
+    }
+}
+
 @MainActor
 final class EditorFormattingTests: XCTestCase {
+    func testFormattingBridgePublishesSelectionWithoutDocumentChanges() async throws {
+        let script = try TestVendor.script("md-preview/Vendor/CodeMirror/mdedit.min.js")
+        let recorder = InspectorSelectionRecorder()
+        let source = "Start 🙂 end"
+        let editor = WebViewLayoutHarness(
+            html: EditorHTML.render(markdown: source, editorJavaScript: script),
+            width: 650, isEditor: true, height: 400, messageHandler: recorder)
+        defer { editor.close() }
+        _ = try await editor.layout(texts: [], imageCount: 0)
+
+        // CodeMirror offsets are UTF-16; the highlighted emoji is two code units.
+        editor.webView.evaluateJavaScript("window.__mdEditor.select(6, 8)", completionHandler: nil)
+        for _ in 0..<30 where !recorder.selectedTexts.contains(where: { $0 == "🙂" }) {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertTrue(recorder.selectedTexts.contains(where: { $0 == "🙂" }))
+
+        let count = recorder.selectedTexts.count
+        editor.webView.evaluateJavaScript("window.__mdEditor.select(8)", completionHandler: nil)
+        for _ in 0..<30 where recorder.selectedTexts.count <= count {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertGreaterThan(recorder.selectedTexts.count, count)
+        XCTAssertNil(recorder.selectedTexts.last ?? nil)
+        let current = try await editor.webView.evaluateJavaScript("window.__mdEditor.getMarkdown()")
+        XCTAssertEqual(current as? String, source)
+    }
+
+    func testSelectionContextPublishesNativeTableCellSelection() async throws {
+        let script = try TestVendor.script("md-preview/Vendor/CodeMirror/mdedit.min.js")
+        let recorder = InspectorSelectionRecorder()
+        let source = "Before\n\n| Label |\n| --- |\n| Ada |\n\nAfter"
+        let editor = WebViewLayoutHarness(
+            html: EditorHTML.render(markdown: source, editorJavaScript: script),
+            width: 650, isEditor: true, height: 400, messageHandler: recorder)
+        defer { editor.close() }
+        _ = try await editor.layout(texts: [], imageCount: 0)
+
+        let selected = try await editor.webView.evaluateJavaScript("""
+            (() => {
+                const cell = document.querySelector('[data-table-row="1"][data-table-column="0"]');
+                cell.focus();
+                cell.replaceChildren(document.createTextNode('Ada | 🙂'));
+                window.getSelection().setBaseAndExtent(cell.firstChild, 4, cell.firstChild, 8);
+                document.dispatchEvent(new Event('selectionchange'));
+                return window.getSelection().toString();
+            })()
+            """)
+        XCTAssertEqual(selected as? String, "| 🙂")
+        for _ in 0..<30 where !recorder.selectedTexts.contains(where: { $0 == "| 🙂" }) {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertTrue(recorder.selectedTexts.contains(where: { $0 == "| 🙂" }))
+
+        let count = recorder.selectedTexts.count
+        _ = try await editor.webView.evaluateJavaScript("""
+            (() => {
+                const cell = document.querySelector('[data-table-row="1"][data-table-column="0"]');
+                window.getSelection().setBaseAndExtent(cell.firstChild, 8, cell.firstChild, 8);
+                document.dispatchEvent(new Event('selectionchange'));
+            })()
+            """)
+        for _ in 0..<30 where recorder.selectedTexts.count <= count {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertGreaterThan(recorder.selectedTexts.count, count)
+        XCTAssertNil(recorder.selectedTexts.last ?? nil)
+        let current = try await editor.webView.evaluateJavaScript("window.__mdEditor.getMarkdown()")
+        XCTAssertEqual(current as? String, source)
+    }
+
     func testFormattingMissingTableCellsDoesNotTargetBodySelection() async throws {
         let script = try TestVendor.script("md-preview/Vendor/CodeMirror/mdedit.min.js")
         for command in ["bold", "keyboard", "link"] {
@@ -350,7 +432,7 @@ final class EditorFormattingTests: XCTestCase {
         XCTAssertEqual(result?["source"] as? String, "- [ ] First\n- [ ] Second")
     }
 
-    func testCompletedParentDoesNotStrikeNestedUncheckedItems() async throws {
+    func testCompletedParentDoesNotMuteNestedUncheckedItems() async throws {
         let script = try TestVendor.script("md-preview/Vendor/CodeMirror/mdedit.min.js")
         let source = "- [x] Parent\n  continuation\n    - [ ] Child\n      child continuation\n    - [x] Done child\n        - [ ] Grandchild\n\n  Parent after children\n- [ ] Sibling"
         let editor = WebViewLayoutHarness(html: EditorHTML.render(markdown: source, editorJavaScript: script),
@@ -359,9 +441,11 @@ final class EditorFormattingTests: XCTestCase {
         _ = try await editor.layout(texts: [], imageCount: 0)
         let result = try await editor.webView.evaluateJavaScript("""
             (() => {
-                const lines = [...document.querySelectorAll('.cm-line')];
-                return Object.fromEntries(lines.filter(line => line.textContent.trim()).map(line =>
-                    [line.textContent.trim(), getComputedStyle(line).textDecorationLine.includes('line-through')]));
+                const lines = [...document.querySelectorAll('.cm-line')].filter(line => line.textContent.trim());
+                const sibling = lines.find(line => line.textContent.trim() === 'Sibling');
+                const plain = getComputedStyle(sibling).color;
+                return Object.fromEntries(lines.map(line =>
+                    [line.textContent.trim(), getComputedStyle(line).color !== plain]));
             })()
             """) as? [String: Bool]
         for label in ["Parent", "continuation", "Done child", "Parent after children"] {
@@ -382,17 +466,19 @@ final class EditorFormattingTests: XCTestCase {
         let result = try await editor.webView.evaluateJavaScript("""
             (() => {
                 const lines = () => [...document.querySelectorAll('.cm-line')];
-                const struck = line => getComputedStyle(line).textDecorationLine.includes('line-through');
-                const initial = struck(lines()[0]) && struck(lines()[1]) && !struck(lines()[2]);
-                const muted = getComputedStyle(lines()[0]).color !== getComputedStyle(lines()[2]).color;
+                const plain = getComputedStyle(lines()[2]).color;
+                const muted = line => getComputedStyle(line).color !== plain;
+                const unstruck = lines().every(line =>
+                    !getComputedStyle(line).textDecorationLine.includes('line-through'));
+                const initial = muted(lines()[0]) && muted(lines()[1]) && !muted(lines()[2]);
                 document.querySelector('.cm-md-task-marker input').click();
-                const cleared = !struck(lines()[0]) && !struck(lines()[1]);
+                const cleared = !muted(lines()[0]) && !muted(lines()[1]);
                 document.querySelector('.cm-md-task-marker input').click();
-                return {initial, muted, cleared, restored: struck(lines()[0]),
+                return {initial, unstruck, cleared, restored: muted(lines()[0]),
                         source: window.__mdEditor.getMarkdown()};
             })()
             """) as? [String: Any]
-        for key in ["initial", "muted", "cleared", "restored"] {
+        for key in ["initial", "unstruck", "cleared", "restored"] {
             XCTAssertEqual(result?[key] as? Bool, true, key)
         }
         XCTAssertEqual(result?["source"] as? String, source)

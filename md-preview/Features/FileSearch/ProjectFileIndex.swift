@@ -21,8 +21,8 @@ actor ProjectFileIndex {
     /// these exclusions; keep it in step when changing them.
     ///
     /// Note this is deliberately *not* the list the open panel accepts, which
-    /// is every document type in Info.plist and so also takes `.txt`.
-    /// Reconciling the two is a user-visible change and belongs in its own PR.
+    /// comes from the document types declared in Info.plist. Reconciling the
+    /// two is a user-visible change and belongs in its own PR.
     nonisolated static let markdownExtensions: Set<String> = [
         "md", "markdown", "mdown", "mkd", "mdwn", "mdx"
     ]

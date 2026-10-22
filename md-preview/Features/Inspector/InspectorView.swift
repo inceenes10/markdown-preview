@@ -6,7 +6,7 @@
 import AppKit
 import SwiftUI
 
-struct DocumentMetadata: Equatable {
+nonisolated struct DocumentMetadata: Equatable, Sendable {
     var fileName: String = ""
     var fileURL: URL?
     var wordCount: Int = 0
@@ -21,7 +21,7 @@ struct DocumentMetadata: Equatable {
 }
 
 extension DocumentMetadata {
-    static func make(url: URL?, markdown: String) -> DocumentMetadata {
+    nonisolated static func make(url: URL?, markdown: String) -> DocumentMetadata {
         var meta = DocumentMetadata()
         meta.fileURL = url
         meta.fileName = url?.lastPathComponent
@@ -35,7 +35,7 @@ extension DocumentMetadata {
         let bodyLines = body.components(separatedBy: .newlines)
 
         meta.characterCount = body.count
-        meta.wordCount = body.split { $0.isWhitespace }.count
+        meta.wordCount = wordCount(ofBody: body)
         meta.lineCount = body.isEmpty ? 0 : bodyLines.count
         meta.headingCount = bodyLines
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("#") }.count
@@ -50,10 +50,21 @@ extension DocumentMetadata {
         }
         return meta
     }
+
+    /// The inspector's word count without the rest of `make`, for callers that
+    /// need only this number.
+    nonisolated static func wordCount(of markdown: String) -> Int {
+        wordCount(ofBody: MarkdownFrontmatter.split(markdown).body)
+    }
+
+    private nonisolated static func wordCount(ofBody body: String) -> Int {
+        body.split { $0.isWhitespace }.count
+    }
 }
 
 struct InspectorView: View {
     let metadata: DocumentMetadata
+    let showsSelectionCounts: Bool
     @State private var tab: Tab = .document
     @State private var pathExpanded = false
 
@@ -160,18 +171,21 @@ struct InspectorView: View {
             }
 
             Section {
-                LabeledContent(
-                    NSLocalizedString("Words", comment: "Inspector field label"),
-                    value: metadata.wordCount.formatted()
-                )
-                LabeledContent(
-                    NSLocalizedString("Characters", comment: "Inspector field label"),
-                    value: metadata.characterCount.formatted()
-                )
-                LabeledContent(
-                    NSLocalizedString("Lines", comment: "Inspector field label"),
-                    value: metadata.lineCount.formatted()
-                )
+                LabeledContent {
+                    Text(metadata.wordCount.formatted())
+                } label: {
+                    countLabel("Words")
+                }
+                LabeledContent {
+                    Text(metadata.characterCount.formatted())
+                } label: {
+                    countLabel("Characters")
+                }
+                LabeledContent {
+                    Text(metadata.lineCount.formatted())
+                } label: {
+                    countLabel("Lines")
+                }
             }
 
             Section {
@@ -198,6 +212,33 @@ struct InspectorView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private func countLabel(_ key: String) -> some View {
+        let title = NSLocalizedString(key, comment: "Inspector field label")
+        if showsSelectionCounts {
+            let suffix = "- " + NSLocalizedString("Selected", comment: "Inspector selected-range count label")
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(title)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Text(suffix)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title)
+                    Text(suffix)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+        } else {
+            Text(title)
+        }
     }
 
     private func pathText(for url: URL) -> Text {

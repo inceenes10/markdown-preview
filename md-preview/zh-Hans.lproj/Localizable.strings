@@ -93,6 +93,7 @@
 "Format:" = "格式：";
 "PDF Document" = "PDF 文稿";
 "HTML Document" = "HTML 文稿";
+"EPUB Book" = "EPUB 图书";
 "The document could not be prepared for export." = "无法准备要导出的文稿。";
 "The selected paper has no printable area." = "所选纸张没有可打印区域。";
 
@@ -194,6 +195,7 @@
 "File Size" = "文件大小";
 "Words" = "单词数";
 "Characters" = "字符数";
+"Selected" = "已选中";
 "Lines" = "行数";
 "Headings" = "标题";
 "Links" = "链接";
@@ -274,6 +276,14 @@
 "Fit diagram" = "适应图表";
 "Open in Window" = "在窗口中打开";
 "Mermaid renderer is unavailable.\n\n" = "Mermaid 渲染器不可用。\n\n";
+"This diagram type is not supported." = "不支持此图表类型。";
+"The diagram has a syntax error." = "图表存在语法错误。";
+"The diagram is not valid." = "图表无效。";
+"The diagram is too large to draw." = "图表过大，无法绘制。";
+"The diagram could not be drawn." = "无法绘制图表。";
+"This diagram is empty." = "此图表为空。";
+"Line %d, column %d" = "第 %1$d 行，第 %2$d 列";
+"Empty diagram. Click to add Mermaid source." = "空图表。点按以添加 Mermaid 源代码。";
 "Footnote %d" = "脚注 %d";
 "Back to reference %d" = "返回脚注引用 %d";
 "KaTeX renderer is unavailable.\n\n" = "KaTeX 渲染器不可用。\n\n";
@@ -319,18 +329,10 @@
 "What’s New in Markdown Preview %@" = "Markdown Preview %@ 的新功能";
 "Release Notes" = "发布说明";
 "Continue" = "继续";
-"Now in Japanese" = "现已支持日语";
-"Choose Japanese in Settings → General → Language, or let it follow your system language." = "在“设置”→“通用”→“语言”中选择日语，或跟随系统语言。";
-"Instant auto save" = "即时自动保存";
-"Choose Instant in Settings → General to save two seconds after you stop typing." = "在“设置”→“通用”中选择“立即”，停止输入两秒后即自动保存。";
-"Expand tables fullscreen" = "全屏展开表格";
-"Choose Expand Table to see a wide table fullscreen. Press Escape to go back." = "选择“展开表格”即可全屏查看宽表格。按 Esc 键返回。";
-"Reopen recent documents" = "重新打开最近的文稿";
-"Press ⇧⌘O to see your 10 most recent files, even with no document open." = "按下 ⇧⌘O 即可查看最近打开的 10 个文件，即使没有打开任何文稿。";
-"Choose text alignment" = "选择文本对齐方式";
-"Set left, center, right, or justified text in Settings → Reading. Quick Look uses it too." = "在“设置”→“阅读”中设置左对齐、居中、右对齐或两端对齐。快速查看也会使用此设置。";
-"More images in Quick Look" = "快速查看显示更多图片";
-"Quick Look shows images from parent folders and follows links to headings." = "快速查看现可显示上级文件夹中的图片，并可跳转到标题链接。";
+"Faster Mermaid diagrams" = "更快的 Mermaid 图表";
+"Diagrams draw faster and take their colors from your theme." = "图表绘制更快，并采用当前主题的颜色。";
+"Counts for selected text" = "所选文本的统计";
+"Select text, and the inspector shows its words, characters, and lines." = "选择文本后，检查器会显示其字数、字符数和行数。";
 
 /* Reading preferences */
 "Strict line breaks" = "严格换行";
@@ -351,6 +353,10 @@
 "Language" = "语言";
 "System Default" = "跟随系统";
 "Quit and reopen Markdown Preview to apply language changes. This setting only affects the app, not Quick Look previews." = "退出并重新打开 Markdown Preview 以应用语言更改。此设置仅影响应用，不影响快速查看预览。";
+"Restart Markdown Preview to change the language?" = "重新启动 Markdown Preview 以更改语言？";
+"The new language applies to menus, settings, and document controls after the app restarts. Quick Look previews keep their system language." = "应用重新启动后，新语言将应用于菜单、设置和文稿控件。快速查看预览保持使用系统语言。";
+"Restart Now" = "立即重新启动";
+"Later" = "稍后";
 
 /* Settings organization */
 "Saving" = "保存";
@@ -383,3 +389,67 @@
 
 /* Table fullscreen control. */
 "Expand Table" = "展开表格";
+"Math formula. Click to edit source." = "数学公式。点按以编辑源代码。";
+
+/* Additional settings, navigation, formatting, and export strings. */
+"GitHub Project" = "GitHub 项目";
+"Bold Text" = "粗体文本";
+"Accessibility & Layout Options" = "辅助功能与布局选项";
+"Customize" = "自定";
+"Line Spacing" = "行距";
+"Character Spacing" = "字间距";
+"Word Spacing" = "词间距";
+"Margins" = "页边距";
+"Colors apply to the current appearance. Start with Original and choose Automatic to set Light and Dark separately." = "颜色应用于当前外观。从“Original”主题开始并选择“自动”外观，可分别设置浅色和深色。";
+"Reset Theme" = "重置主题";
+"Customize Theme" = "自定主题";
+"Themes & Settings" = "主题与设置";
+"Appearance: %@" = "外观：%@";
+"No recent files" = "没有最近使用的文件";
+"Recent Files" = "最近使用的文件";
+"File Results" = "文件搜索结果";
+"The pasted image could not be inserted into the document." = "无法将粘贴的图像插入文稿。";
+"Export PDF" = "导出 PDF";
+"Export document as PDF" = "将文稿导出为 PDF";
+"Export document" = "导出文稿";
+"Text size, appearance, and themes" = "文本大小、外观和主题";
+"Sidebar Mode" = "边栏模式";
+"Show or hide the sidebar" = "显示或隐藏边栏";
+"Text Style" = "文本样式";
+"Lists" = "列表";
+"More Formatting" = "更多格式";
+"None" = "无";
+"PNG Image" = "PNG 图像";
+"Wrap code" = "代码换行";
+"Unwrap code" = "取消代码换行";
+"Open Link" = "打开链接";
+"Open Link in New Window" = "在新窗口中打开链接";
+"Copy Link" = "拷贝链接";
+"The document could not be rendered as an image." = "无法将文稿渲染为图像。";
+"The image could not be allocated." = "无法为图像分配内存。";
+"The image could not be encoded." = "无法对图像进行编码。";
+"theme_Original" = "Original";
+"theme_Quiet" = "Quiet";
+"theme_Paper" = "Paper";
+"theme_Bold" = "Bold";
+"theme_Calm" = "Calm";
+"theme_Focus" = "Focus";
+"theme_Graphite" = "Graphite";
+"theme_Dusk" = "Dusk";
+"theme_Midnight" = "Midnight";
+"Original" = "Original";
+"Athelas" = "Athelas";
+"Charter" = "Charter";
+"Georgia" = "Georgia";
+"Iowan" = "Iowan";
+"Palatino" = "Palatino";
+"Seravek" = "Seravek";
+"Avenir Next" = "Avenir Next";
+"New York" = "New York";
+"SF Rounded" = "SF Rounded";
+"Times New Roman" = "Times New Roman";
+"The team looking after our recommendation system has been spiking out some new algorithms, and the results are promising enough that we are planning to put them in front of readers next month. Long paragraphs are what make a reading face show its character: the rhythm of the lines, how the spacing settles, where the eye lands when it returns from the end of one line to the start of the next." = "负责我们推荐系统的团队最近一直在试验一些新算法，其表现十分令人期待，我们计划在下个月向读者推出。长段落最能展现阅读字体的风采与特质：行间流淌的韵律、疏密有致的间距，以及视线从行末折返到下一行行首时的自然落点。";
+"Nothing you change here reaches your open documents until you tap the check mark, so try a few faces and spacings, then close with the cross to leave everything exactly as you found it. The sample keeps going past the bottom of this panel, the way a page would, so the measure and the margins have somewhere to show themselves before you commit to them." = "在此处进行的任何更改，只有在点按勾选标记后才会应用到已打开的文稿中。您可以尽情尝试不同的字体和间距，点按叉号关闭即可完全保留原样。样例文本会像真实页面一样延伸至面板底部之外，让您在确认应用之前，能够充分预览行宽与页边距的排版效果。";
+
+/* Share popover word count */
+"%ld words" = "%ld 个词";

@@ -17,7 +17,7 @@ final class EditorViewController: NSViewController, WKNavigationDelegate {
 
     /// Fired on every document change — the host debounces for autosave.
     var contentDidChange: (() -> Void)?
-    var formattingDidChange: ((Int, Set<String>) -> Void)?
+    var formattingDidChange: ((Int, Set<String>, String?) -> Void)?
     /// Fired after CodeMirror has constructed and painted its initial document.
     /// The split view uses this to avoid replacing the preview with a blank WKWebView.
     var editorDidBecomeReady: (() -> Void)?
@@ -322,6 +322,14 @@ final class EditorViewController: NSViewController, WKNavigationDelegate {
         }
     }
 
+    /// Navigate to a heading in the current editor source without moving the cursor.
+    func scrollToSourceLine(_ line: Int) {
+        guard line > 0 else { return }
+        webView.evaluateJavaScript(
+            "window.__mdEditor && window.__mdEditor.setScrollPosition(0, \(line), 0)"
+        ) { _, _ in }
+    }
+
     func fetchScrollAnchor(_ completion: @escaping (SourceScrollAnchor?) -> Void) {
         webView.evaluateJavaScript(
             "window.__mdEditor && window.__mdEditor.getScrollAnchor()"
@@ -445,7 +453,7 @@ final class EditorViewController: NSViewController, WKNavigationDelegate {
             guard let heading = payload["heading"] as? Int,
                   (0...6).contains(heading),
                   let commands = payload["commands"] as? [String] else { return }
-            formattingDidChange?(heading, Set(commands))
+            formattingDidChange?(heading, Set(commands), payload["selectedText"] as? String)
         case "findResult":
             guard let index = payload["index"] as? Int,
                   let total = payload["total"] as? Int else { return }
@@ -504,11 +512,12 @@ final class EditorViewController: NSViewController, WKNavigationDelegate {
     private static let editorJavaScript =
         vendorResource("mdedit.min", ext: "js", subdir: "Vendor/CodeMirror") ?? ""
     private static let mermaidJavaScript =
-        vendorResource("mermaid.min", ext: "js", subdir: "Vendor/Mermaid") ?? ""
+        vendorResource("pele.global", ext: "js", subdir: "Vendor/Pele") ?? ""
 
     private static func containsMermaidFence(in markdown: String) -> Bool {
         markdown.range(
-            of: #"(?im)^[ \t]{0,3}(?:`{3,}|~{3,})[ \t]*mermaid(?:[ \t]|$)"#,
+            // A fence can also open after quote markers or a list marker.
+            of: #"(?im)^[ \t>]*(?:(?:[-+*]|\d+[.)])[ \t]+)*(?:`{3,}|~{3,})[ \t]*mermaid(?:[ \t]|$)"#,
             options: .regularExpression
         ) != nil
     }

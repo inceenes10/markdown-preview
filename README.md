@@ -68,7 +68,7 @@ Or grab the latest signed and notarized DMG from the [Releases](https://github.c
 
 ## Features
 
-**App language:** Choose **Settings → General → Language** to use a bundled translation independently of your system language. Quit and reopen the app to apply the choice to settings, menus, and document controls. **System Default** removes the app override and follows macOS again. This preference persists across launches and affects only the app; Quick Look previews continue to use their system-selected language. Available languages are discovered from the app’s bundled translations.
+**App language:** Choose **Settings → General → Language** to use a bundled translation independently of your system language. The app offers to restart right away so the choice applies to settings, menus, and document controls; choose **Later** to keep working, and it applies the next time you open the app. **System Default** removes the app override and follows macOS again. This preference persists across launches and affects only the app; Quick Look previews continue to use their system-selected language. Available languages are discovered from the app’s bundled translations.
 
 Settings groups window behavior, saving, and external tools under **General**. **Reading** contains text size, content width, text alignment, Markdown line breaks, and outline highlighting. **Appearance** contains themes and their font, spacing, and color customization; resetting a theme leaves global Reading preferences unchanged.
 
@@ -77,11 +77,11 @@ Settings groups window behavior, saving, and external tools under **General**. *
 Single source newlines remain visible by default. Enable **Settings → Reading → Markdown → Strict line breaks** to let ordinary source lines flow into paragraphs in reading view and Quick Look. Two trailing spaces or a backslash still create an explicit line break; blank lines still separate paragraphs. Reopen an existing Quick Look preview after changing this setting.
 
 - **Native rendering** — `WKWebView` pipeline backed by [swift-markdown](https://github.com/swiftlang/swift-markdown), with heading anchors and link handling. Bare `http://` and `https://` URLs are clickable in the app and Quick Look previews.
-- **Read Mode** — select and copy text, follow links, and browse tables. Click task checkboxes to save each change directly to the file. Tables and Quick Look previews remain read-only. Table words and inline code retain their natural widths; wide tables scroll horizontally. In Read or Edit mode, use **Expand Table** above a table to open a read-only fullscreen snapshot. Press Escape or close the table window to return to the document.
+- **Read Mode** — select and copy text, follow links, and browse tables. Click task checkboxes to save each change directly to the file. Tables and Quick Look previews remain read-only. Table words and inline code retain their natural widths, and in Markdown table cells Chinese and Japanese text wraps at spaces and punctuation instead of between characters; wide tables scroll horizontally. In Read or Edit mode, use **Expand Table** above a table to open a read-only snapshot in its own window, which you can resize, minimize, or make fullscreen. Press Escape or close the table window to return to the document.
 - **App links** — Read Mode and Quick Look support custom URL schemes. Before opening an unapproved custom link with a registered app, a compact dialog names the app and offers Cancel, Allow, and Always Allow, with Cancel as the default. For an unapproved custom link with no registered app, an alert reports that no application can open the link. Use Copy Link in the context menu to inspect the destination. “Always Allow” saves approval for that URL scheme across documents, app restarts, and Quick Look. Reset approvals in Settings → General → App links. HTTP, HTTPS, mailto, and the app’s own `md-preview:` links open without this prompt, even after resetting approvals. Executable URLs and literal `file://` links remain blocked; embedded resources cannot launch custom app links.
 - **Edit Mode** — edit Markdown in place with a formatting toolbar for headings, emphasis, lists, quotes, code, and links. Table cells show inline formatting until focused, then reveal their Markdown syntax for editing. Task markers become checkboxes once you finish typing the closing bracket; Enter continues a task list, and Enter on an empty task exits it. Toggle it from the toolbar or with <kbd>⌘E</kbd>, then save with <kbd>⌘S</kbd>.
 - **Mermaid diagrams** — fenced `mermaid` code blocks render as diagrams in both the app and Quick Look previews, using a bundled renderer so previews work offline without a CDN request.
-- **Math equations** — LaTeX inline (`$x_1 + x_2$`), display (`$$\int_0^1 x^2\,dx$$`), and fenced `math` blocks render with a bundled KaTeX. Selecting a rendered formula and copying yields the original LaTeX source (via the official `copy-tex` extension).
+- **Math equations** — LaTeX inline (`$x_1 + x_2$`), display (`$$\int_0^1 x^2\,dx$$`), and fenced `math` blocks render with bundled KaTeX in reading and edit modes. In edit mode, click a formula to edit its highlighted LaTeX source; move the caret away to render it again. Inline math source uses inline-code styling; spaces immediately inside either `$` delimiter leave the expression literal. Standalone `$$` source uses the code-block card with visible delimiters and no header controls; fenced `math` uses the usual code-block controls with hidden fences. Pressing Enter after a standalone `$$` inserts a matching closing delimiter and places the caret between them; single-line `$$ equation $$` stays on one source line. Unclosed math stays editable as source. Selecting a rendered formula and copying yields the original LaTeX source (via the official `copy-tex` extension).
 - **Document outline** — sidebar TOC that mirrors your headings; click to jump.
 - **Collapsible sidebar** — the outline and file picker hides when the sidebar collapses; the sidebar toggle stays available to reopen it.
 - **File navigator** — browse Markdown files in the sidebar. Click a folder's name, icon, or empty row space to expand or collapse it, or use its disclosure triangle. Click a file to open it in the current reading or editing mode.
@@ -92,8 +92,9 @@ Single source newlines remain visible by default. Enable **Settings → Reading 
 - **Open in LLM** — send the current Markdown file to Codex, Claude, or ChatGPT from the toolbar. Supported apps open with file or folder context where possible, with a copy-and-open fallback for longer prompts.
 - **Text zoom** — bump text up or down in Read or Edit mode with the toolbar's <kbd>A A</kbd> control or <kbd>⌘+</kbd> / <kbd>⌘−</kbd> / <kbd>⌘0</kbd>, or pinch the trackpad in Read mode. Discrete Safari-style stops from 50% to 300%.
 - **Paper printing** — the Markdown Preview pane in the print dialog provides Font Size (6–48 pt) and Scale (50–200%). Scaling refits tables before pagination and updates the native preview. Font Size is remembered; Scale applies to the current print dialog. PDF and PNG exports preserve the preview’s appearance.
+- **EPUB export** — *File → Export…* offers **EPUB Book** alongside PDF, HTML, and PNG, for reading long documents in Apple Books or on an e-reader, where the reader sets the text size and spacing. The book is split into sections at the shallowest heading level that repeats, with a table of contents built from the headings. Images are embedded, Mermaid diagrams become pictures, math is exported as MathML, and `title`, `author`, and `lang` frontmatter name the book. Typeface and page colours come from the reading app, not the preview’s theme.
 - **Customizable toolbar** — drag in the items you actually use (Print, Copy, Zoom, Sidebar, Open With, Inspector, Share, Search, Search for Document) via *View → Customize Toolbar…* Standard AppKit affordance, your layout sticks across launches.
-- **Share = copy the source** — the share toolbar feeds the picker the Markdown text itself, so **Copy** writes the raw source to the clipboard (great for pasting into ChatGPT / Claude), and Mail, Messages, and Notes get the content in the body instead of a file URL.
+- **Share = copy the source** — the share toolbar feeds the picker the Markdown text itself, so **Copy** writes the raw source to the clipboard (great for pasting into ChatGPT / Claude), and Mail, Messages, and Notes get the content in the body instead of a file URL. The popover header shows the file name, word count, and size, and **Export** and **Print** sit above the system services.
 - **Quick Look extension** — system-wide `.md` previews from Finder spacebar, Spotlight, and Mail attachments without launching the app.
 - **Command line tools** — install `mdp`, `md-preview`, and `markdown-preview` from the app menu, then open files or folders from any shell with commands like `mdp README.md` or `mdp .`.
 - **URL scheme** — open a file or folder from a browser link or another app with `md-preview://file/<absolute path>` (e.g. `md-preview://file/Users/me/project/README.md`), the same shape as `cursor://file/…`. Percent-encode special characters in the path (a space becomes `%20`).
@@ -102,7 +103,7 @@ Single source newlines remain visible by default. Enable **Settings → Reading 
 
 ## Supported file types
 
-`.md`, `.markdown`, `.mdown`, `.mdx`, `.txt`
+`.md`, `.markdown`, `.mdown`, `.mdx`
 UTI: `net.daringfireball.markdown`
 
 ## Requirements
@@ -187,7 +188,7 @@ Markdown Preview is free and MIT-licensed. If it saved you a browser tab, you ca
 ## Acknowledgments
 - [Amore](http://amore.computer/) — MacOS release automation (signing, notarization, DMG, hosting, appcast)
 - [swift-markdown](https://github.com/swiftlang/swift-markdown) — Markdown parser (Apple, cmark-gfm-backed)
-- [Mermaid](https://mermaid.js.org/) — Bundled diagram renderer for `mermaid` fenced code blocks
+- [Pele](https://pele.run/) — Bundled renderer for Mermaid diagrams in `mermaid` fenced code blocks
 - [KaTeX](https://katex.org/) — Bundled math typesetter for inline `$…$`, display `$$…$$`, and ` ```math ` blocks
 - [Sparkle](https://sparkle-project.org) — Auto-update framework
 - [Sentry](https://sentry.io) — Privacy-filtered native crash reporting

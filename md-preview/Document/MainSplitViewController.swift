@@ -30,6 +30,9 @@ final class MainSplitViewController: NSSplitViewController {
         // Sequoia's tabs end at the content layout guide without Tahoe's
         // extra margin. Tucking the rows upward clips the first row.
         guard #available(macOS 26.0, *) else { return 0 }
+        // macOS 27 closes the tab bar with a hard header edge instead of an
+        // empty margin, so tucking upward presses the rows against it.
+        if #available(macOS 27.0, *) { return 0 }
         guard let window, window.tabGroup?.isTabBarVisible == true else { return 0 }
         return window.styleMask.contains(.fullScreen)
             ? formattingBarTabBarOverlapFullScreen : formattingBarTabBarOverlap
@@ -38,18 +41,31 @@ final class MainSplitViewController: NSSplitViewController {
     var onSelectFile: ((URL) -> Void)?
     var onOpenMarkdownLink: ((URL) -> Void)?
     private var sidebarCollapseObservation: NSKeyValueObservation?
+    private var inspectorCollapseObservation: NSKeyValueObservation?
+    var onLiveMetadataNeedsRefresh: (() -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         let sidebarVC = SidebarViewController()
-        sidebarVC.onSelectHeading = { [weak self] index in
-            // Pin before scrolling so a no-op scroll still confirms the click.
-            self?.contentViewController?.markHeadingActiveFromClick(index)
-            self?.contentViewController?.scrollToHeading(index: index)
+        sidebarVC.onSelectHeading = { [weak self] index, sourceLine in
+            guard let self else { return }
+            if self.isEditingDocument {
+                // The preview behind the editor can contain older headings.
+                guard self.isEditorVisible else { return }
+                self.cachedEditorViewController?.scrollToSourceLine(sourceLine)
+            } else {
+                // Pin before scrolling so a no-op scroll still confirms the click.
+                self.contentViewController?.markHeadingActiveFromClick(index)
+                self.contentViewController?.scrollToHeading(index: index)
+            }
         }
         sidebarVC.onSelectFile = { [weak self] url in
             self?.onSelectFile?(url)
+        }
+        sidebarVC.onModeChanged = { [weak self] mode in
+            guard mode == .outline, self?.isSidebarVisible == true else { return }
+            self?.onLiveMetadataNeedsRefresh?()
         }
         let sidebar = Self.makeSidebarItem(for: sidebarVC, themed: false)
 
@@ -68,7 +84,17 @@ final class MainSplitViewController: NSSplitViewController {
 
         sidebarCollapseObservation = sidebar.observe(\.isCollapsed, options: [.new]) { [weak self] _, _ in
             DispatchQueue.main.async { [weak self] in
-                (self?.view.window?.windowController as? DocumentWindowController)?.syncSidebarToolbarState()
+                guard let self else { return }
+                (self.view.window?.windowController as? DocumentWindowController)?.syncSidebarToolbarState()
+                if self.isSidebarVisible && self.sidebarMode == .outline {
+                    self.onLiveMetadataNeedsRefresh?()
+                }
+            }
+        }
+        inspectorCollapseObservation = inspector.observe(\.isCollapsed, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isInspectorVisible else { return }
+                self.onLiveMetadataNeedsRefresh?()
             }
         }
 
@@ -83,6 +109,10 @@ final class MainSplitViewController: NSSplitViewController {
         }
         contentViewController?.activeHeadingDidChange = { [weak self] headingID in
             self?.sidebarViewController?.setActiveHeading(headingID)
+        }
+        contentViewController?.selectedTextDidChange = { [weak self] text in
+            guard let self, !self.isEditingDocument else { return }
+            self.updateInspectorSelection(text)
         }
         contentViewController?.localMarkdownLinkActivated = { [weak self] url in
             self?.onOpenMarkdownLink?(url)
@@ -106,7 +136,27 @@ final class MainSplitViewController: NSSplitViewController {
             renderImmediately: renderImmediately
         )
         sidebarViewController?.display(markdown: markdown, fileName: fileName, fileURL: url)
+        inspectorViewController?.setSelectedText(nil)
         inspectorViewController?.display(metadata: DocumentMetadata.make(url: url, markdown: markdown))
+    }
+
+    /// Update selected-range statistics without refreshing the preview or TOC.
+    func updateInspectorSelection(_ text: String?) {
+        inspectorViewController?.setSelectedText(text)
+    }
+  
+    /// Apply already-computed live results; AppKit and SwiftUI remain on main.
+    func applyLiveSidebarUpdates(outline: [TOCItem]?, metadata: DocumentMetadata?, fileURL: URL?) {
+        if let outline, isSidebarVisible && sidebarMode == .outline {
+            sidebarViewController?.refreshOutline(
+                outline: outline,
+                fileName: fileURL?.lastPathComponent
+                    ?? NSLocalizedString("Untitled", comment: "Untitled document name")
+            )
+        }
+        if let metadata, isInspectorVisible {
+            inspectorViewController?.display(metadata: metadata)
+        }
     }
 
     /// URL-only refresh after a rename. Skips the content re-render so
@@ -115,7 +165,12 @@ final class MainSplitViewController: NSSplitViewController {
     func openFileURLDidChange(_ newURL: URL, markdown: String) {
         contentViewController?.sourceFileURLDidChange(newURL)
         sidebarViewController?.openFileURLDidChange(newURL)
-        inspectorViewController?.display(metadata: DocumentMetadata.make(url: newURL, markdown: markdown))
+        if isEditingDocument {
+            // Preserve live counts until the editor snapshot is fetched for the new URL.
+            inspectorViewController?.updateFileURL(newURL)
+        } else {
+            inspectorViewController?.display(metadata: DocumentMetadata.make(url: newURL, markdown: markdown))
+        }
     }
 
     func openFolder(_ folderURL: URL, selectedFileURL: URL?) {
@@ -125,6 +180,7 @@ final class MainSplitViewController: NSSplitViewController {
     }
 
     func clearContent() {
+        inspectorViewController?.setSelectedText(nil)
         contentViewController?.clearContent()
     }
 

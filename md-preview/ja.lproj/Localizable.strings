@@ -93,6 +93,7 @@
 "Format:" = "フォーマット:";
 "PDF Document" = "PDF 書類";
 "HTML Document" = "HTML 書類";
+"EPUB Book" = "EPUB ブック";
 "The document could not be prepared for export." = "書類の書き出し準備ができませんでした。";
 "The selected paper has no printable area." = "選択した用紙にはプリント可能な領域がありません。";
 
@@ -113,7 +114,7 @@
 "Heading 1" = "見出し 1";
 "Heading 2" = "見出し 2";
 "Heading 3" = "見出し 3";
-"Bold" = "ボールド";
+"Bold" = "太字";
 "Italic" = "イタリック";
 "Strikethrough" = "取り消し線";
 "Inline Code" = "インラインコード";
@@ -194,6 +195,7 @@
 "File Size" = "ファイルサイズ";
 "Words" = "単語数";
 "Characters" = "文字数";
+"Selected" = "選択中";
 "Lines" = "行数";
 "Headings" = "見出し";
 "Links" = "リンク";
@@ -274,6 +276,14 @@
 "Fit diagram" = "ダイアグラム全体を表示";
 "Open in Window" = "ウインドウで開く";
 "Mermaid renderer is unavailable.\n\n" = "Mermaid レンダラーを利用できません。\n\n";
+"This diagram type is not supported." = "この種類のダイアグラムには対応していません。";
+"The diagram has a syntax error." = "ダイアグラムに構文エラーがあります。";
+"The diagram is not valid." = "ダイアグラムが正しくありません。";
+"The diagram is too large to draw." = "ダイアグラムが大きすぎるため描画できません。";
+"The diagram could not be drawn." = "ダイアグラムを描画できませんでした。";
+"This diagram is empty." = "このダイアグラムは空です。";
+"Line %d, column %d" = "%1$d 行目、%2$d 列目";
+"Empty diagram. Click to add Mermaid source." = "空のダイアグラムです。クリックして Mermaid のソースを追加します。";
 "Footnote %d" = "脚注 %d";
 "Back to reference %d" = "参照元 %d に戻る";
 "KaTeX renderer is unavailable.\n\n" = "KaTeX レンダラーを利用できません。\n\n";
@@ -319,18 +329,10 @@
 "What’s New in Markdown Preview %@" = "Markdown Preview %@ の新機能";
 "Release Notes" = "リリースノート";
 "Continue" = "続ける";
-"Now in Japanese" = "日本語に対応";
-"Choose Japanese in Settings → General → Language, or let it follow your system language." = "「設定」→「一般」→「言語」で日本語を選択するか、システムの言語に合わせることができます。";
-"Instant auto save" = "即時自動保存";
-"Choose Instant in Settings → General to save two seconds after you stop typing." = "「設定」→「一般」で「即時」を選択すると、入力を止めてから2秒後に保存されます。";
-"Expand tables fullscreen" = "表をフルスクリーンで表示";
-"Choose Expand Table to see a wide table fullscreen. Press Escape to go back." = "「表を拡大」を選択すると、幅の広い表をフルスクリーンで表示できます。Esc キーで戻ります。";
-"Reopen recent documents" = "最近の書類を再び開く";
-"Press ⇧⌘O to see your 10 most recent files, even with no document open." = "⇧⌘O を押すと、書類を開いていなくても最近開いた 10 個のファイルが表示されます。";
-"Choose text alignment" = "テキストの配置を選択";
-"Set left, center, right, or justified text in Settings → Reading. Quick Look uses it too." = "「設定」→「書類の表示」で左揃え、中央揃え、右揃え、両端揃えを設定できます。クイックルックにも適用されます。";
-"More images in Quick Look" = "クイックルックで表示できる画像が増加";
-"Quick Look shows images from parent folders and follows links to headings." = "クイックルックで親フォルダの画像を表示し、見出しへのリンクで移動できるようになりました。";
+"Faster Mermaid diagrams" = "より速い Mermaid 図";
+"Diagrams draw faster and take their colors from your theme." = "図の描画がより速くなり、テーマの色で表示されます。";
+"Counts for selected text" = "選択したテキストのカウント";
+"Select text, and the inspector shows its words, characters, and lines." = "テキストを選択すると、インスペクタにその単語数、文字数、行数が表示されます。";
 
 /* Reading preferences */
 "Strict line breaks" = "厳密な改行";
@@ -351,6 +353,10 @@
 "Language" = "言語";
 "System Default" = "システムのデフォルト";
 "Quit and reopen Markdown Preview to apply language changes. This setting only affects the app, not Quick Look previews." = "言語の変更を適用するには、Markdown Preview を終了して再度開いてください。この設定はアプリにのみ適用され、Quick Look プレビューには適用されません。";
+"Restart Markdown Preview to change the language?" = "言語を変更するために Markdown Preview を再起動しますか？";
+"The new language applies to menus, settings, and document controls after the app restarts. Quick Look previews keep their system language." = "新しい言語は、アプリの再起動後にメニュー、設定、書類のコントロールに適用されます。Quick Look プレビューはシステムの言語のままです。";
+"Restart Now" = "今すぐ再起動";
+"Later" = "あとで";
 
 /* Settings organization */
 "Saving" = "保存";
@@ -383,3 +389,67 @@
 
 /* Table fullscreen control. */
 "Expand Table" = "表を拡大";
+"Math formula. Click to edit source." = "数式。クリックしてソースを編集します。";
+
+/* Additional settings, navigation, formatting, and export strings. */
+"GitHub Project" = "GitHub プロジェクト";
+"Bold Text" = "太字";
+"Accessibility & Layout Options" = "アクセシビリティとレイアウトのオプション";
+"Customize" = "カスタマイズ";
+"Line Spacing" = "行間";
+"Character Spacing" = "文字間隔";
+"Word Spacing" = "単語間隔";
+"Margins" = "余白";
+"Colors apply to the current appearance. Start with Original and choose Automatic to set Light and Dark separately." = "色は現在の外観に適用されます。「Original」テーマを選択して外観を「自動」にすると、ライトとダークの色を個別に設定できます。";
+"Reset Theme" = "テーマをリセット";
+"Customize Theme" = "テーマをカスタマイズ";
+"Themes & Settings" = "テーマと設定";
+"Appearance: %@" = "外観: %@";
+"No recent files" = "最近使ったファイルはありません";
+"Recent Files" = "最近使ったファイル";
+"File Results" = "ファイルの検索結果";
+"The pasted image could not be inserted into the document." = "貼り付けた画像を書類に挿入できませんでした。";
+"Export PDF" = "PDF を書き出す";
+"Export document as PDF" = "書類を PDF として書き出す";
+"Export document" = "書類を書き出す";
+"Text size, appearance, and themes" = "テキストサイズ、外観、テーマ";
+"Sidebar Mode" = "サイドバーの表示モード";
+"Show or hide the sidebar" = "サイドバーを表示／非表示";
+"Text Style" = "テキストスタイル";
+"Lists" = "リスト";
+"More Formatting" = "その他の書式";
+"None" = "なし";
+"PNG Image" = "PNG 画像";
+"Wrap code" = "コードを折り返す";
+"Unwrap code" = "コードの折り返しを解除";
+"Open Link" = "リンクを開く";
+"Open Link in New Window" = "リンクを新規ウインドウで開く";
+"Copy Link" = "リンクをコピー";
+"The document could not be rendered as an image." = "書類を画像として描画できませんでした。";
+"The image could not be allocated." = "画像用のメモリを確保できませんでした。";
+"The image could not be encoded." = "画像をエンコードできませんでした。";
+"theme_Original" = "Original";
+"theme_Quiet" = "Quiet";
+"theme_Paper" = "Paper";
+"theme_Bold" = "Bold";
+"theme_Calm" = "Calm";
+"theme_Focus" = "Focus";
+"theme_Graphite" = "Graphite";
+"theme_Dusk" = "Dusk";
+"theme_Midnight" = "Midnight";
+"Original" = "Original";
+"Athelas" = "Athelas";
+"Charter" = "Charter";
+"Georgia" = "Georgia";
+"Iowan" = "Iowan";
+"Palatino" = "Palatino";
+"Seravek" = "Seravek";
+"Avenir Next" = "Avenir Next";
+"New York" = "New York";
+"SF Rounded" = "SF Rounded";
+"Times New Roman" = "Times New Roman";
+"The team looking after our recommendation system has been spiking out some new algorithms, and the results are promising enough that we are planning to put them in front of readers next month. Long paragraphs are what make a reading face show its character: the rhythm of the lines, how the spacing settles, where the eye lands when it returns from the end of one line to the start of the next." = "私たちの推薦システムを担当するチームは、新しいアルゴリズムをいくつか試しています。有望な結果が得られているので、来月には読者の皆さんに使っていただく予定です。長い段落を読むと、書体の特徴がよくわかります。行が生み出すリズム、文字の間隔、そして行末から次の行の先頭へ移るときの視線の動きを確かめてみてください。";
+"Nothing you change here reaches your open documents until you tap the check mark, so try a few faces and spacings, then close with the cross to leave everything exactly as you found it. The sample keeps going past the bottom of this panel, the way a page would, so the measure and the margins have somewhere to show themselves before you commit to them." = "ここで変更した内容は、チェックマークをクリックするまで開いている書類には反映されません。いくつかの書体や間隔を試してみてください。×ボタンで閉じると変更前の状態に戻ります。このサンプルは実際のページのようにパネルの下まで続いているため、確定する前に行の長さや余白のバランスを確認できます。";
+
+/* Share popover word count */
+"%ld words" = "%ld 語";

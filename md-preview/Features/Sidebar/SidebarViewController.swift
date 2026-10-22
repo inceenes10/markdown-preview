@@ -12,7 +12,7 @@ final class SidebarViewController: NSViewController {
         case files = 1
     }
 
-    var onSelectHeading: ((Int) -> Void)?
+    var onSelectHeading: ((Int, Int) -> Void)?
     var onSelectFile: ((URL) -> Void)?
     var onModeChanged: ((Mode) -> Void)?
 
@@ -24,6 +24,8 @@ final class SidebarViewController: NSViewController {
     private var titleItem: TitleItem?
     private var lastRenderedMarkdown: String?
     private var lastRenderedFileName: String?
+    private var lastRenderedOutline: [TOCItem] = []
+    private var resetOutlineState = false
     private var loadedFolderURL: URL?
     private var pendingFolderURL: URL?
     private var pendingFileURL: URL?
@@ -136,18 +138,63 @@ final class SidebarViewController: NSViewController {
 
     func display(markdown: String, fileName: String, fileURL: URL?) {
         loadViewIfNeeded()
+        // A newly opened document must not inherit another file's outline choices.
+        if pendingFileURL != fileURL?.standardizedFileURL {
+            resetOutlineState = true
+        }
         setOpenFileURL(fileURL)
+        refreshOutline(markdown: markdown, fileName: fileName)
+    }
 
-        guard markdown != lastRenderedMarkdown || fileName != lastRenderedFileName else { return }
+    /// Full document display may parse synchronously; live edits supply a
+    /// precomputed outline so parsing stays off the main thread.
+    func refreshOutline(markdown: String, fileName: String) {
+        guard resetOutlineState || markdown != lastRenderedMarkdown || fileName != lastRenderedFileName else { return }
+        let outline = MarkdownTOC.parse(markdown)
         lastRenderedMarkdown = markdown
+        displayOutline(outline, fileName: fileName)
+    }
+
+    func refreshOutline(outline: [TOCItem], fileName: String) {
+        // Invalidate the full-source cache: its value predates this live outline.
+        lastRenderedMarkdown = nil
+        displayOutline(outline, fileName: fileName)
+    }
+
+    private func displayOutline(_ outline: [TOCItem], fileName: String) {
+        loadViewIfNeeded()
+        guard resetOutlineState || outline != lastRenderedOutline || fileName != lastRenderedFileName else { return }
+
+        // Source lines can change without altering the visible heading tree.
+        // Update click destinations in place rather than resetting outline UI.
+        if !resetOutlineState, fileName == lastRenderedFileName,
+           updateSourceLines(outline, in: roots) {
+            lastRenderedOutline = outline
+            return
+        }
+
+        // The heading structure changed; use the original default expansion behavior.
+        resetOutlineState = false
+        lastRenderedOutline = outline
         lastRenderedFileName = fileName
         titleItem = fileName.isEmpty ? nil : TitleItem(title: fileName)
-        roots = MarkdownTOC.parse(markdown).map(TOCNode.init)
+        roots = outline.map(TOCNode.init)
         outlineView.reloadData()
         for root in roots {
             outlineView.expandItem(root, expandChildren: true)
         }
         outlineView.deselectAll(nil)
+    }
+
+    /// Reuse the existing outline rows when only source locations changed.
+    private func updateSourceLines(_ items: [TOCItem], in nodes: [TOCNode]) -> Bool {
+        guard items.count == nodes.count else { return false }
+        for (item, node) in zip(items, nodes) {
+            guard item.id == node.headingID, item.level == node.level, item.title == node.title,
+                  updateSourceLines(item.children, in: node.children) else { return false }
+            node.sourceLine = item.sourceLine
+        }
+        return true
     }
 
     /// Update the tracked file URL after a rename — keeps the navigator
@@ -231,18 +278,18 @@ final class SidebarViewController: NSViewController {
 
     private var lastRowColorAppearance: NSAppearance.Name?
 
-    /// Theme accent for the active TOC row — the link color, so the
-    /// sidebar's highlight matches the page's primary color. Nil without a
-    /// link override; the system accent then applies.
+    /// Theme accent for the active TOC row before macOS 27 — the link
+    /// color, so the sidebar's highlight matches the page's primary color.
+    /// Nil without a link override; the system accent then applies.
     private var themeAccent: NSColor? {
         let isDark = view.effectiveAppearance
             .bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         return ThemeColorsSetting.current.color(.linkColor, isDark ? .dark : .light)
     }
 
-    /// Re-applies text colors to visible rows: the selected heading gets
-    /// the theme accent (or the system accent), everything else the plain
-    /// label colors.
+    /// Re-applies text colors to visible rows: before macOS 27 the
+    /// selected heading gets the theme accent (or the system accent); on
+    /// macOS 27, and for every other row, the plain label color.
     func refreshRowTextColors() {
         guard isViewLoaded else { return }
         view.needsDisplay = true
@@ -252,12 +299,9 @@ final class SidebarViewController: NSViewController {
         for row in 0..<outlineView.numberOfRows {
             guard let cell = outlineView.view(
                 atColumn: 0, row: row, makeIfNecessary: false
-            ) as? NSTableCellView, let textField = cell.textField else { continue }
-            if cell.identifier?.rawValue == "TitleCell" {
-                textField.textColor = .secondaryLabelColor
-                continue
-            }
-            textField.textColor = row == selected ? accent : .labelColor
+            ) as? SidebarLabelCellView else { continue }
+            cell.label.textColor = SidebarLabelCellView.textColor(
+                selected: row == selected, accent: accent)
         }
     }
 
@@ -290,20 +334,48 @@ final class SidebarViewController: NSViewController {
     @objc private func rowClicked(_ sender: Any?) {
         let row = outlineView.clickedRow
         guard row >= 0, let node = outlineView.item(atRow: row) as? TOCNode else { return }
-        onSelectHeading?(node.headingID)
+        onSelectHeading?(node.headingID, node.sourceLine)
     }
 }
 
 /// Row view whose selection never draws emphasized. While the mouse is
 /// down, AppKit emphasizes the pressed row and fills the selection pill
 /// with the system accent color — which fights the theme. Suppressing the
-/// emphasized state keeps the quiet source-list fill in every state; the
-/// theme accent lives in the row's text color instead. Stateless, so it
-/// is created directly rather than recycled. Shared with ProjectNavigatorView.
+/// emphasized state keeps the quiet source-list fill in every state;
+/// before macOS 27 the theme accent lives in the row's text color
+/// instead. Stateless, so it is created directly rather than recycled. Shared with ProjectNavigatorView.
 final class QuietSelectionRowView: NSTableRowView {
     override var isEmphasized: Bool {
         get { false }
         set {}
+    }
+}
+
+/// Sidebar row cell whose label keeps its own weight and color when the
+/// row is selected. macOS 27 sets the selected source-list row's
+/// `textField` in semibold, so there the label stays out of that outlet
+/// and the selected row keeps the plain label color. Earlier releases
+/// keep the outlet and the theme accent. Shared with ProjectNavigatorView.
+final class SidebarLabelCellView: NSTableCellView {
+    let label = NSTextField(labelWithString: "")
+
+    init(identifier: NSUserInterfaceItemIdentifier) {
+        super.init(frame: .zero)
+        self.identifier = identifier
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        if #unavailable(macOS 27.0) {
+            textField = label
+        }
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    static func textColor(selected: Bool, accent: @autoclosure () -> NSColor) -> NSColor {
+        if #available(macOS 27.0, *) { return .labelColor }
+        return selected ? accent() : .labelColor
     }
 }
 
@@ -316,12 +388,14 @@ final class TOCNode {
     let headingID: Int
     let level: Int
     let title: String
+    var sourceLine: Int
     let children: [TOCNode]
 
     init(_ item: TOCItem) {
         self.headingID = item.id
         self.level = item.level
         self.title = item.title
+        self.sourceLine = item.sourceLine
         self.children = item.children.map(TOCNode.init)
     }
 }
@@ -356,23 +430,19 @@ extension SidebarViewController: NSOutlineViewDelegate {
         guard let node = item as? TOCNode else { return nil }
 
         let identifier = NSUserInterfaceItemIdentifier("TOCCell")
-        let cell: NSTableCellView
-        if let recycled = outlineView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView {
+        let cell: SidebarLabelCellView
+        if let recycled = outlineView.makeView(withIdentifier: identifier, owner: self) as? SidebarLabelCellView {
             cell = recycled
         } else {
-            cell = NSTableCellView()
-            cell.identifier = identifier
+            cell = SidebarLabelCellView(identifier: identifier)
 
-            let textField = NSTextField(labelWithString: "")
-            textField.translatesAutoresizingMaskIntoConstraints = false
+            let textField = cell.label
             textField.lineBreakMode = .byTruncatingTail
             textField.cell?.usesSingleLineMode = true
             textField.cell?.truncatesLastVisibleLine = true
             textField.maximumNumberOfLines = 1
             textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             textField.setContentHuggingPriority(.defaultLow, for: .horizontal)
-            cell.addSubview(textField)
-            cell.textField = textField
 
             NSLayoutConstraint.activate([
                 textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
@@ -381,11 +451,11 @@ extension SidebarViewController: NSOutlineViewDelegate {
             ])
         }
 
-        cell.textField?.stringValue = node.title
+        cell.label.stringValue = node.title
         let row = outlineView.row(forItem: node)
-        cell.textField?.textColor = row >= 0 && row == outlineView.selectedRow
-            ? (themeAccent ?? .controlAccentColor)
-            : .labelColor
+        cell.label.textColor = SidebarLabelCellView.textColor(
+            selected: row >= 0 && row == outlineView.selectedRow,
+            accent: themeAccent ?? .controlAccentColor)
         return cell
     }
 
